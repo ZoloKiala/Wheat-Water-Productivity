@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Generated model artifacts — retrain with `python backend/train_model.py`
+backend/models/
+
+# Frontend
+node_modules/
+frontend/dist/
+
+# Test output
+tests/screenshots/
+tests/node_modules/
+tests/package*.json
+
+# Office lock files and OS cruft
+~$*
+Thumbs.db
+.DS_Store

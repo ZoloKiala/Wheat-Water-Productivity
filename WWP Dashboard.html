@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wheat Water Productivity Dashboard — EIAR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+<style>
+:root{
+  --green-950:#0f3320; --green-900:#14432b; --green-800:#1a5735; --green-700:#1e6b3f; --green-600:#27824d;
+  --gold:#d9a03f; --gold-dark:#b07f28; --wheat:#f3e5c3;
+  --bg:#f4f5f1; --card:#ffffff; --ink:#1c2b22; --muted:#5f6f64; --line:#dfe4da; --line-2:#ccd4c7;
+  --red:#c2452d;
+}
+*{box-sizing:border-box; margin:0; padding:0}
+html,body{height:100%}
+body{font-family:"Public Sans",system-ui,sans-serif; background:var(--bg); color:var(--ink); font-size:14px; overflow:hidden}
+a{color:var(--green-700); text-decoration:none}
+a:hover{color:var(--green-900); text-decoration:underline}
+button{font-family:inherit; cursor:pointer}
+select,input{font-family:inherit}
+
+/* ── Header ── */
+.hdr{background:var(--green-900); color:#fff; height:58px; display:flex; align-items:center; gap:20px; padding:0 20px; flex-shrink:0}
+.brand{display:flex; align-items:center; gap:11px}
+.brand .mark{width:36px;height:36px;border-radius:8px;background:linear-gradient(140deg,var(--green-600),var(--green-800));display:grid;place-items:center;border:1px solid rgba(255,255,255,.25)}
+.brand .t1{font-size:15px;font-weight:800;letter-spacing:.01em;line-height:1.15}
+.brand .t2{font-size:11px;color:#bcd6c5;line-height:1.2}
+.hdr nav{display:flex;gap:4px;margin-left:12px}
+.hdr nav a{color:#d7e6dc;font-size:13px;font-weight:600;padding:7px 12px;border-radius:6px;text-decoration:none}
+.hdr nav a:hover{background:rgba(255,255,255,.1);color:#fff}
+.hdr nav a.on{background:rgba(255,255,255,.16);color:#fff}
+.hdr .right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.lang{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;font-size:12px;font-weight:600;padding:5px 12px}
+.lang:hover{background:rgba(255,255,255,.12)}
+.crumb{background:#fff;border-bottom:1px solid var(--line);padding:7px 20px;font-size:12px;color:var(--muted);flex-shrink:0}
+.crumb b{color:var(--ink);font-weight:600}
+
+/* ── Layout ── */
+.app{display:flex; height:calc(100vh - 58px - 31px - 34px)}
+.side{width:308px;flex-shrink:0;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow-y:auto}
+.mapwrap{flex:1;position:relative;min-width:0}
+#map{position:absolute;inset:0;background:#dfe8dc}
+.results{width:372px;flex-shrink:0;background:var(--card);border-left:1px solid var(--line);overflow-y:auto;display:none}
+.results.open{display:block}
+
+/* ── Sidebar ── */
+.sec{padding:16px 18px;border-bottom:1px solid var(--line)}
+.sec h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px}
+.stepnum{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:var(--green-700);color:#fff;font-size:10px;font-weight:700;margin-right:6px;vertical-align:-3px}
+.tabs{display:flex;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:3px;margin-bottom:12px}
+.tabs button{flex:1;border:0;background:transparent;border-radius:6px;padding:6px 4px;font-size:12px;font-weight:600;color:var(--muted)}
+.tabs button.on{background:#fff;color:var(--green-800);box-shadow:0 1px 3px rgba(20,40,25,.15)}
+.fld{margin-bottom:10px}
+.fld label{display:block;font-size:12px;font-weight:600;color:var(--ink);margin-bottom:4px}
+.fld select,.fld input[type=text]{width:100%;padding:8px 10px;border:1px solid var(--line-2);border-radius:7px;background:#fff;font-size:13px;color:var(--ink)}
+.fld select:focus{outline:2px solid var(--green-600);outline-offset:1px}
+.hint{font-size:11.5px;color:var(--muted);line-height:1.45;margin-top:6px}
+.drop{border:1.5px dashed var(--line-2);border-radius:9px;padding:18px 14px;text-align:center;background:var(--bg);cursor:pointer}
+.drop:hover{border-color:var(--green-600);background:#eef3ea}
+.drop .big{font-size:13px;font-weight:600;color:var(--green-800);margin-top:6px}
+.drop .small{font-size:11.5px;color:var(--muted);margin-top:3px}
+.filechip{display:flex;align-items:center;gap:8px;background:#eef3ea;border:1px solid #cfdcc9;border-radius:7px;padding:8px 10px;font-size:12.5px;font-weight:600;color:var(--green-900);margin-top:10px}
+.filechip .x{margin-left:auto;border:0;background:transparent;color:var(--muted);font-size:14px;line-height:1}
+.seg{display:flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
+.seg button{flex:1;border:0;background:#fff;padding:8px 6px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.seg button + button{border-left:1px solid var(--line-2)}
+.seg button.on{background:var(--green-700);color:#fff}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.runbtn{width:100%;padding:11px;border:0;border-radius:8px;background:var(--green-700);color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px}
+.runbtn:hover{background:var(--green-800)}
+.runbtn:disabled{background:#9db3a4;cursor:default}
+.drawbtn{width:100%;padding:9px;border:1px solid var(--green-700);border-radius:8px;background:#fff;color:var(--green-800);font-size:13px;font-weight:600}
+.drawbtn:hover{background:#eef3ea}
+.drawbtn.armed{background:var(--green-700);color:#fff}
+.side .foot{margin-top:auto;padding:14px 18px;font-size:11px;color:var(--muted);line-height:1.5}
+
+/* ── Map controls ── */
+.legend{position:absolute;right:14px;bottom:26px;z-index:800;background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:9px;padding:12px 14px;box-shadow:0 4px 18px rgba(20,40,25,.18);width:190px}
+.legend h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px}
+.ramp{height:10px;border-radius:5px;background:linear-gradient(90deg,#a63603,#e08214,#f7dd72,#a6d96a,#1a7a3c)}
+.ramplbl{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-top:4px}
+.maptip{position:absolute;left:50%;transform:translateX(-50%);top:14px;z-index:800;background:rgba(20,60,35,.92);color:#fff;font-size:12.5px;font-weight:600;padding:8px 16px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.3);display:none}
+.scalechip{position:absolute;left:14px;bottom:26px;z-index:800;background:rgba(255,255,255,.95);border:1px solid var(--line);border-radius:7px;padding:6px 10px;font-size:11px;color:var(--muted)}
+.spin{position:absolute;inset:0;z-index:900;background:rgba(244,245,241,.65);display:none;align-items:center;justify-content:center}
+.spin .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 26px;box-shadow:0 10px 40px rgba(20,40,25,.25);text-align:center}
+.spin .bars{display:flex;gap:5px;justify-content:center;height:26px;align-items:center;margin-bottom:10px}
+.spin .bars i{width:5px;height:22px;border-radius:3px;background:var(--green-600);animation:bb .9s ease-in-out infinite}
+.spin .bars i:nth-child(2){animation-delay:.15s;background:var(--gold)}
+.spin .bars i:nth-child(3){animation-delay:.3s}
+@keyframes bb{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1.15)}}
+.spin p{font-size:13px;font-weight:600;color:var(--ink)}
+.spin small{font-size:11.5px;color:var(--muted)}
+
+/* ── Results ── */
+.rhead{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:8px;position:sticky;top:0;background:#fff;z-index:5}
+.rhead h2{font-size:15px;font-weight:800}
+.rhead .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+.rhead .close{margin-left:auto;border:0;background:transparent;font-size:18px;color:var(--muted);line-height:1;padding:2px}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 18px}
+.kpi{border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:#fff}
+.kpi.hero{grid-column:1/-1;background:linear-gradient(135deg,var(--green-800),var(--green-600));border:0;color:#fff}
+.kpi .l{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.kpi.hero .l{color:#cfe6d6}
+.kpi .v{font-size:21px;font-weight:800;margin-top:2px}
+.kpi.hero .v{font-size:30px}
+.kpi .u{font-size:11.5px;font-weight:600;color:var(--muted)}
+.kpi.hero .u{color:#cfe6d6}
+.chartsec{padding:4px 18px 16px}
+.chartsec h3{font-size:12.5px;font-weight:700;margin-bottom:2px}
+.chartsec .note{font-size:11px;color:var(--muted);margin-bottom:8px}
+.chartbox{border:1px solid var(--line);border-radius:9px;padding:10px;background:#fff}
+.exportrow{display:flex;gap:8px;padding:0 18px 20px}
+.exportrow button{flex:1;padding:9px;border-radius:7px;font-size:12.5px;font-weight:600;border:1px solid var(--line-2);background:#fff;color:var(--ink)}
+.exportrow button:hover{border-color:var(--green-700);color:var(--green-800)}
+.badge{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--wheat);color:#7a5a17;margin-left:6px;vertical-align:2px}
+
+/* ── Explain drawer ── */
+.explain{border-top:3px solid var(--gold);margin-top:6px}
+.explain .rhead{border-bottom:1px solid var(--line)}
+
+/* ── Modal ── */
+.modal{position:fixed;inset:0;z-index:2000;background:rgba(15,40,25,.45);display:none;align-items:center;justify-content:center;padding:30px}
+.modal.open{display:flex}
+.modal .box{background:#fff;border-radius:12px;max-width:640px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.4)}
+.modal .mh{padding:16px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;position:sticky;top:0;background:#fff}
+.modal .mh h2{font-size:16px;font-weight:800}
+.modal .mh button{margin-left:auto;border:0;background:transparent;font-size:20px;color:var(--muted)}
+.modal .mb{padding:18px 22px;font-size:13px;line-height:1.65;color:#33413a}
+.modal .mb h4{font-size:13px;font-weight:700;margin:14px 0 4px;color:var(--ink)}
+.modal .mb p{margin-bottom:8px}
+.modal .mb ol{padding-left:18px}
+.modal .mb ol li{margin-bottom:5px}
+
+/* ── Footer ── */
+.ftr{height:34px;background:#fff;border-top:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 20px;font-size:11px;color:var(--muted);flex-shrink:0}
+.ftr .dot{width:3px;height:3px;border-radius:50%;background:var(--line-2)}
+.ftr a{font-weight:600}
+
+.leaflet-container{font-family:"Public Sans",sans-serif}
+.leaflet-popup-content-wrapper{border-radius:9px}
+.pop h5{font-size:12px;font-weight:700;margin-bottom:4px}
+.pop .pv{font-size:20px;font-weight:800;color:var(--green-800)}
+.pop .pu{font-size:11px;color:var(--muted)}
+.pop table{font-size:11.5px;margin-top:6px;border-collapse:collapse}
+.pop td{padding:2px 8px 2px 0;color:var(--muted)}
+.pop td+td{color:var(--ink);font-weight:600}
+.pop .explink{display:inline-block;margin-top:8px;font-size:12px;font-weight:700}
+.toast{position:fixed;bottom:48px;left:50%;transform:translateX(-50%);z-index:3000;background:var(--green-900);color:#fff;font-size:12.5px;font-weight:600;padding:9px 18px;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.3);opacity:0;transition:opacity .25s;pointer-events:none}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="brand">
+    <div class="mark">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 21V9" stroke="#f3e5c3" stroke-width="1.6" stroke-linecap="round"/><path d="M12 9c0-3 2-5 5-5 0 3-2 5-5 5Zm0 4c0-3 2-5 5-5 0 3-2 5-5 5Zm0 4c0-3 2-5 5-5 0 3-2 5-5 5Zm0-8c0-3-2-5-5-5 0 3 2 5 5 5Zm0 4c0-3-2-5-5-5 0 3 2 5 5 5Zm0 4c0-3-2-5-5-5 0 3 2 5 5 5Z" fill="#e8c877"/></svg>
+    </div>
+    <div>
+      <div class="t1">Wheat Water Productivity</div>
+      <div class="t2">Ethiopian Institute of Agricultural Research</div>
+    </div>
+  </div>
+  <nav>
+    <a class="on" href="#">Dashboard</a>
+    <a href="#" data-about="method">Methodology</a>
+    <a href="#" data-about="data">Data sources</a>
+    <a href="#" data-about="guide">User guide</a>
+  </nav>
+  <div class="right">
+    <button class="lang" id="langBtn">EN ▾</button>
+  </div>
+</header>
+<div class="crumb">eiar.gov.et › Research tools › <b>Wheat Water Productivity Dashboard</b></div>
+
+<div class="app">
+  <!-- ───────── Sidebar ───────── -->
+  <aside class="side">
+    <div class="sec">
+      <h3><span class="stepnum">1</span>Area of interest</h3>
+      <div class="tabs" id="aoiTabs">
+        <button class="on" data-tab="admin">Admin unit</button>
+        <button data-tab="upload">Upload</button>
+        <button data-tab="draw">Draw</button>
+      </div>
+      <div id="tab-admin">
+        <div class="fld"><label for="selRegion">Region</label>
+          <select id="selRegion"></select></div>
+        <div class="fld"><label for="selZone">Zone</label>
+          <select id="selZone"></select></div>
+        <div class="fld"><label for="selWoreda">Woreda</label>
+          <select id="selWoreda"></select></div>
+        <p class="hint">Analysis runs on the selected woreda extent. Boundaries follow CSA 2023 administrative units.</p>
+      </div>
+      <div id="tab-upload" style="display:none">
+        <div class="drop" id="dropZone">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#27824d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+          <div class="big">Upload field or scheme boundary</div>
+          <div class="small">Zipped shapefile (.zip) or GeoJSON, max 20 MB, EPSG:4326</div>
+        </div>
+        <input type="file" id="fileInput" accept=".zip,.geojson,.json" style="display:none">
+        <div id="fileChip" style="display:none" class="filechip">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a5735" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+          <span id="fileName"></span>
+          <button class="x" id="fileClear" title="Remove file">✕</button>
+        </div>
+        <p class="hint">Attribute fields are read automatically. Geometry is validated on upload.</p>
+      </div>
+      <div id="tab-draw" style="display:none">
+        <button class="drawbtn" id="drawBtn">Draw polygon on map</button>
+        <p class="hint">Click the map to add vertices. Double-click to finish. Press Esc to cancel.</p>
+        <div id="drawChip" style="display:none" class="filechip">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a5735" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+          <span id="drawInfo"></span>
+          <button class="x" id="drawClear" title="Remove polygon">✕</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h3><span class="stepnum">2</span>Production system</h3>
+      <div class="seg" id="sysSeg">
+        <button class="on" data-v="rainfed">Rainfed</button>
+        <button data-v="irrigated">Irrigated</button>
+      </div>
+      <p class="hint" id="sysHint">Rainfed analysis uses the Meher and Belg growing seasons.</p>
+    </div>
+
+    <div class="sec">
+      <h3><span class="stepnum">3</span>Season</h3>
+      <div class="row2">
+        <div class="fld"><label for="selYear">Year</label>
+          <select id="selYear">
+            <option>2025/26</option><option selected>2024/25</option><option>2023/24</option><option>2022/23</option><option>2021/22</option>
+          </select></div>
+        <div class="fld"><label for="selSeason">Season</label>
+          <select id="selSeason">
+            <option>Meher</option><option>Belg</option>
+          </select></div>
+      </div>
+      <p class="hint">NPP is retrieved from FAO WaPOR v3 for the selected season (100 m, dekadal).</p>
+    </div>
+
+    <div class="sec">
+      <button class="runbtn" id="runBtn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        Run analysis
+      </button>
+      <p class="hint" style="text-align:center" id="runHint">Computes WWP at 100 m and predicts productivity with the LightGBM model.</p>
+    </div>
+
+    <div class="foot">
+      Wheat Water Productivity Tool (WWPT) · developed by IWMI East Africa with EIAR under WaPOR Phase II, supported by FAO and the Government of the Netherlands.
+    </div>
+  </aside>
+
+  <!-- ───────── Map ───────── -->
+  <main class="mapwrap">
+    <div id="map"></div>
+    <div class="maptip" id="mapTip">Click to add vertices · double-click to finish</div>
+    <div class="legend" id="legend" style="display:none">
+      <h4>Wheat water productivity</h4>
+      <div class="ramp"></div>
+      <div class="ramplbl"><span>0.4</span><span>0.8</span><span>1.2</span><span>1.6+</span></div>
+      <div class="ramplbl" style="justify-content:center;margin-top:2px"><span>kg grain per m³ of water · 100 m</span></div>
+    </div>
+    <div class="spin" id="spin">
+      <div class="card">
+        <div class="bars"><i></i><i></i><i></i></div>
+        <p id="spinMsg">Retrieving WaPOR NPP…</p>
+        <small id="spinSub">Season composite · 100 m</small>
+      </div>
+    </div>
+  </main>
+
+  <!-- ───────── Results ───────── -->
+  <aside class="results" id="results">
+    <div class="rhead">
+      <div>
+        <h2>Analysis results</h2>
+        <div class="sub" id="resSub"></div>
+      </div>
+      <button class="close" id="resClose" title="Close results">✕</button>
+    </div>
+    <div class="kpis" id="kpis"></div>
+
+    <div class="chartsec">
+      <h3>Seasonal trend</h3>
+      <div class="note">Mean WWP across the last five seasons, same extent</div>
+      <div class="chartbox"><svg id="trendChart" width="100%" height="120" viewBox="0 0 320 120"></svg></div>
+    </div>
+
+    <div class="chartsec">
+      <h3>Distribution</h3>
+      <div class="note">Share of wheat area by WWP class</div>
+      <div class="chartbox"><svg id="histChart" width="100%" height="110" viewBox="0 0 320 110"></svg></div>
+    </div>
+
+    <div class="chartsec">
+      <h3>What drives productivity here <span class="badge">LightGBM</span></h3>
+      <div class="note">Global feature importance of the prediction model</div>
+      <div class="chartbox"><svg id="featChart" width="100%" height="170" viewBox="0 0 320 170"></svg></div>
+    </div>
+
+    <div class="chartsec" id="explainSec" style="display:none">
+      <h3>Prediction explanation <span class="badge">Selected pixel</span></h3>
+      <div class="note" id="explainNote"></div>
+      <div class="chartbox"><svg id="shapChart" width="100%" height="190" viewBox="0 0 320 190"></svg></div>
+    </div>
+
+    <div class="exportrow">
+      <button id="csvBtn">Export values (CSV)</button>
+      <button id="pngBtn">Save map (PNG)</button>
+    </div>
+  </aside>
+</div>
+
+<footer class="ftr">
+  <span>© 2026 Ethiopian Institute of Agricultural Research</span><span class="dot"></span>
+  <span>Data: FAO WaPOR v3</span><span class="dot"></span>
+  <a href="#" data-about="cite">How to cite</a><span class="dot"></span>
+  <a href="#" data-about="disclaimer">Disclaimer</a>
+</footer>
+
+<!-- About modal -->
+<div class="modal" id="modal">
+  <div class="box">
+    <div class="mh"><h2 id="modalTitle"></h2><button id="modalClose">✕</button></div>
+    <div class="mb" id="modalBody"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ───────────────────────── Data ───────────────────────── */
+const ADMIN = {
+  "Oromia": {
+    "Arsi": {
+      "Hetosa":       {c:[8.13, 39.24], d:0.14},
+      "Tiyo":         {c:[7.96, 39.10], d:0.13},
+      "Digelu Tijo":  {c:[7.84, 39.20], d:0.14},
+      "Lemu Bilbilo": {c:[7.62, 39.22], d:0.16},
+      "Munesa":       {c:[7.55, 38.95], d:0.16}
+    },
+    "West Arsi": {
+      "Kofele":  {c:[7.07, 38.78], d:0.14},
+      "Dodola":  {c:[6.98, 39.18], d:0.16},
+      "Adaba":   {c:[7.01, 39.40], d:0.17}
+    },
+    "Bale": {
+      "Sinana":  {c:[7.10, 40.22], d:0.15},
+      "Agarfa":  {c:[7.28, 39.82], d:0.15},
+      "Goba":    {c:[7.01, 39.98], d:0.14}
+    },
+    "East Shewa": {
+      "Ada'a":   {c:[8.72, 38.98], d:0.14},
+      "Lume":    {c:[8.60, 39.20], d:0.13}
+    }
+  },
+  "Amhara": {
+    "North Shewa": {
+      "Basona Werana": {c:[9.65, 39.45], d:0.15},
+      "Angolela Tera": {c:[9.45, 39.42], d:0.14}
+    },
+    "South Wollo": {
+      "Dessie Zuria":  {c:[11.05, 39.60], d:0.14},
+      "Kutaber":       {c:[11.22, 39.53], d:0.13}
+    }
+  },
+  "Afar": {
+    "Gabi Rasu (Zone 3)": {
+      "Amibara": {c:[9.33, 40.17], d:0.15},
+      "Gewane":  {c:[10.17, 40.64], d:0.16}
+    },
+    "Awsi Rasu (Zone 1)": {
+      "Dubti":   {c:[11.73, 41.08], d:0.15}
+    }
+  }
+};
+const FEATURES = [
+  {n:"Seasonal NPP (WaPOR)",        imp:100},
+  {n:"Seasonal rainfall",           imp:78},
+  {n:"Actual evapotranspiration",   imp:71},
+  {n:"Soil organic carbon",         imp:52},
+  {n:"Elevation",                   imp:44},
+  {n:"Fertilizer applied (NPS)",    imp:39},
+  {n:"Planting dekad",              imp:31},
+  {n:"Improved seed use",           imp:24},
+  {n:"Extension visits",            imp:15},
+  {n:"Distance to market",          imp:11}
+];
+const state = { aoi:"admin", region:"Oromia", zone:"Arsi", woreda:"Hetosa",
+  system:"rainfed", polygon:null, upload:null, bounds:null, cells:null, lastRun:null };
+
+/* ───────────────────────── Map ───────────────────────── */
+const map = L.map('map', {zoomControl:true, doubleClickZoom:false}).setView([9.0, 39.6], 6);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© OpenStreetMap contributors', maxZoom:18}).addTo(map);
+map.zoomControl.setPosition('topright');
+let aoiLayer = null, rasterLayer = null, clickMarker = null;
+
+/* deterministic value field: WWP kg/m3 at (lat,lng) */
+function wwpAt(lat, lng, sys){
+  const s = Math.sin(lat*57.3)*Math.cos(lng*43.7) + Math.sin(lat*13.1+lng*17.9)*0.6
+          + Math.sin(lat*151+lng*97)*0.35 + Math.sin(lat*311-lng*271)*0.2;
+  let v = 1.0 + s*0.28;
+  if (sys==="irrigated") v += 0.28;
+  return Math.max(0.25, Math.min(1.85, v));
+}
+const RAMP = [[0.4,[166,54,3]],[0.7,[224,130,20]],[1.0,[247,221,114]],[1.3,[166,217,106]],[1.6,[26,122,60]]];
+function colorFor(v){
+  if (v<=RAMP[0][0]) return RAMP[0][1];
+  for (let i=0;i<RAMP.length-1;i++){
+    const [a,ca]=RAMP[i],[b,cb]=RAMP[i+1];
+    if (v<=b){const t=(v-a)/(b-a);return ca.map((c,k)=>Math.round(c+(cb[k]-c)*t));}
+  }
+  return RAMP[RAMP.length-1][1];
+}
+function pointInPoly(pt, poly){
+  let inside=false;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const [yi,xi]=poly[i],[yj,xj]=poly[j];
+    if(((xi>pt[1])!==(xj>pt[1])) && (pt[0] < (yj-yi)*(pt[1]-xi)/(xj-xi)+yi)) inside=true;
+  }
+  return inside;
+}
+
+function currentAOI(){
+  if (state.aoi==="admin"){
+    const w = ADMIN[state.region][state.zone][state.woreda];
+    const d = w.d;
+    return {label:`${state.woreda} woreda, ${state.zone} (${state.region})`,
+      bounds:[[w.c[0]-d, w.c[1]-d],[w.c[0]+d, w.c[1]+d]], poly:null};
+  }
+  if (state.aoi==="upload" && state.upload) return state.upload;
+  if (state.aoi==="draw" && state.polygon){
+    const lats=state.polygon.map(p=>p[0]), lngs=state.polygon.map(p=>p[1]);
+    return {label:"Drawn polygon", poly:state.polygon,
+      bounds:[[Math.min(...lats),Math.min(...lngs)],[Math.max(...lats),Math.max(...lngs)]]};
+  }
+  return null;
+}
+
+function drawAOIOutline(aoi){
+  if (aoiLayer) map.removeLayer(aoiLayer);
+  aoiLayer = aoi.poly
+    ? L.polygon(aoi.poly, {color:"#14432b", weight:2, dashArray:"6 4", fill:false})
+    : L.rectangle(aoi.bounds, {color:"#14432b", weight:2, dashArray:"6 4", fill:false});
+  aoiLayer.addTo(map);
+}
+
+/* raster render on canvas → imageOverlay */
+function renderRaster(aoi, sys){
+  const [[s,w],[n,e]] = aoi.bounds;
+  const N = 180;
+  const cv = document.createElement('canvas'); cv.width=N; cv.height=N;
+  const ctx = cv.getContext('2d'); const img = ctx.createImageData(N,N);
+  const vals = [];
+  for (let r=0;r<N;r++){
+    const lat = n - (r+0.5)/N*(n-s);
+    for (let c=0;c<N;c++){
+      const lng = w + (c+0.5)/N*(e-w);
+      const i = (r*N+c)*4;
+      const inside = aoi.poly ? pointInPoly([lat,lng], aoi.poly) : true;
+      /* wheat mask: drop ~18% of cells pseudo-randomly (non-wheat) */
+      const mask = Math.sin(lat*997+lng*641)*0.5+0.5;
+      if (!inside || mask<0.18){ img.data[i+3]=0; continue; }
+      const v = wwpAt(lat,lng,sys); vals.push(v);
+      const [R,G,B] = colorFor(v);
+      img.data[i]=R; img.data[i+1]=G; img.data[i+2]=B; img.data[i+3]=225;
+    }
+  }
+  ctx.putImageData(img,0,0);
+  if (rasterLayer) map.removeLayer(rasterLayer);
+  rasterLayer = L.imageOverlay(cv.toDataURL(), aoi.bounds, {opacity:1, className:'pix'}).addTo(map);
+  document.querySelectorAll('.pix').forEach(el=>el.style.imageRendering='pixelated');
+  return vals;
+}
+
+/* ───────────────────────── Sidebar wiring ───────────────────────── */
+function fillSelect(sel, items, val){
+  sel.innerHTML = items.map(i=>`<option${i===val?" selected":""}>${i}</option>`).join("");
+}
+const selRegion=document.getElementById('selRegion'), selZone=document.getElementById('selZone'), selWoreda=document.getElementById('selWoreda');
+function syncAdmin(level){
+  if (level<=0){ fillSelect(selRegion, Object.keys(ADMIN), state.region); }
+  const zones = Object.keys(ADMIN[state.region]);
+  if (!zones.includes(state.zone)) state.zone = zones[0];
+  fillSelect(selZone, zones, state.zone);
+  const wor = Object.keys(ADMIN[state.region][state.zone]);
+  if (!wor.includes(state.woreda)) state.woreda = wor[0];
+  fillSelect(selWoreda, wor, state.woreda);
+  const aoi = currentAOI();
+  if (state.aoi==="admin" && aoi){ drawAOIOutline(aoi); map.fitBounds(aoi.bounds, {padding:[40,40]}); }
+}
+selRegion.onchange = e=>{ state.region=e.target.value; syncAdmin(1); };
+selZone.onchange   = e=>{ state.zone=e.target.value;   syncAdmin(2); };
+selWoreda.onchange = e=>{ state.woreda=e.target.value; syncAdmin(3); };
+syncAdmin(0);
+
+document.getElementById('aoiTabs').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if(!b) return;
+  document.querySelectorAll('#aoiTabs button').forEach(x=>x.classList.toggle('on', x===b));
+  state.aoi = b.dataset.tab;
+  ["admin","upload","draw"].forEach(t=>document.getElementById('tab-'+t).style.display = t===state.aoi?"":"none");
+  const aoi = currentAOI();
+  if (aoi){ drawAOIOutline(aoi); map.fitBounds(aoi.bounds,{padding:[40,40]}); }
+});
+
+/* upload */
+const dropZone=document.getElementById('dropZone'), fileInput=document.getElementById('fileInput');
+dropZone.onclick = ()=>fileInput.click();
+dropZone.ondragover = e=>{e.preventDefault(); dropZone.style.borderColor="var(--green-600)";};
+dropZone.ondragleave = ()=>dropZone.style.borderColor="";
+dropZone.ondrop = e=>{e.preventDefault(); if(e.dataTransfer.files[0]) acceptFile(e.dataTransfer.files[0]);};
+fileInput.onchange = ()=>{ if(fileInput.files[0]) acceptFile(fileInput.files[0]); };
+function acceptFile(f){
+  document.getElementById('fileName').textContent = f.name;
+  document.getElementById('fileChip').style.display="flex";
+  /* demo: uploaded scheme lands in Amibara irrigated scheme */
+  state.upload = {label:`Uploaded boundary — ${f.name}`, poly:null, bounds:[[9.24,40.08],[9.42,40.28]]};
+  const aoi = currentAOI(); drawAOIOutline(aoi); map.fitBounds(aoi.bounds,{padding:[40,40]});
+  toast("Boundary validated: 1 polygon, EPSG:4326");
+}
+document.getElementById('fileClear').onclick = ()=>{
+  state.upload=null; fileInput.value="";
+  document.getElementById('fileChip').style.display="none";
+  if (aoiLayer){map.removeLayer(aoiLayer); aoiLayer=null;}
+};
+
+/* draw */
+const drawBtn=document.getElementById('drawBtn'), mapTip=document.getElementById('mapTip');
+let drawing=false, drawPts=[], drawLine=null;
+drawBtn.onclick = ()=>{ drawing?cancelDraw():startDraw(); };
+function startDraw(){
+  drawing=true; drawPts=[]; drawBtn.classList.add('armed'); drawBtn.textContent="Cancel drawing";
+  mapTip.style.display="block"; map.getContainer().style.cursor="crosshair";
+}
+function cancelDraw(){
+  drawing=false; drawBtn.classList.remove('armed'); drawBtn.textContent="Draw polygon on map";
+  mapTip.style.display="none"; map.getContainer().style.cursor="";
+  if (drawLine){map.removeLayer(drawLine); drawLine=null;}
+}
+map.on('click', e=>{
+  if(!drawing) return;
+  drawPts.push([e.latlng.lat, e.latlng.lng]);
+  if (drawLine) map.removeLayer(drawLine);
+  drawLine = L.polyline(drawPts, {color:"#b07f28", weight:2.5}).addTo(map);
+});
+map.on('dblclick', e=>{
+  if(!drawing || drawPts.length<3) return;
+  state.polygon = drawPts.slice();
+  cancelDraw();
+  const aoi=currentAOI(); drawAOIOutline(aoi);
+  const areaHa = Math.round(polyAreaHa(state.polygon));
+  document.getElementById('drawInfo').textContent = `Polygon · ${drawPts.length} vertices · ~${areaHa.toLocaleString()} ha`;
+  document.getElementById('drawChip').style.display="flex";
+});
+document.addEventListener('keydown', e=>{ if(e.key==="Escape"&&drawing) cancelDraw(); });
+document.getElementById('drawClear').onclick = ()=>{
+  state.polygon=null; document.getElementById('drawChip').style.display="none";
+  if (aoiLayer){map.removeLayer(aoiLayer); aoiLayer=null;}
+};
+function polyAreaHa(poly){
+  let a=0;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++)
+    a += (poly[j][1]+poly[i][1])*(poly[j][0]-poly[i][0]);
+  return Math.abs(a/2) * 110.57*110.57*Math.cos(poly[0][0]*Math.PI/180) * 100; /* deg²→ha approx */
+}
+
+/* system + season */
+document.getElementById('sysSeg').addEventListener('click', e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  document.querySelectorAll('#sysSeg button').forEach(x=>x.classList.toggle('on',x===b));
+  state.system=b.dataset.v;
+  const sea = document.getElementById('selSeason');
+  if (state.system==="irrigated"){ sea.innerHTML="<option>Dry season (Nov–Mar)</option>"; 
+    document.getElementById('sysHint').textContent="Irrigated analysis covers dry-season wheat on scheme or pump-based systems.";
+  } else { sea.innerHTML="<option>Meher</option><option>Belg</option>";
+    document.getElementById('sysHint').textContent="Rainfed analysis uses the Meher and Belg growing seasons."; }
+});
+
+/* ───────────────────────── Run analysis ───────────────────────── */
+const spin=document.getElementById('spin'), results=document.getElementById('results');
+document.getElementById('runBtn').onclick = async ()=>{
+  const aoi = currentAOI();
+  if (!aoi){ toast(state.aoi==="upload"?"Upload a boundary file first.":"Draw a polygon first."); return; }
+  const btn=document.getElementById('runBtn'); btn.disabled=true;
+  spin.style.display="flex";
+  const steps=[["Retrieving WaPOR NPP…","Season composite · 100 m"],
+               ["Computing water productivity…","NPP → biomass → grain yield"],
+               ["Running LightGBM inference…","Biophysical + socioeconomic features"]];
+  for (const [m,s] of steps){
+    document.getElementById('spinMsg').textContent=m;
+    document.getElementById('spinSub').textContent=s;
+    await new Promise(r=>setTimeout(r, 650));
+  }
+  drawAOIOutline(aoi);
+  const vals = renderRaster(aoi, state.system);
+  spin.style.display="none"; btn.disabled=false;
+  document.getElementById('legend').style.display="block";
+  map.fitBounds(aoi.bounds,{padding:[40,40]});
+  state.lastRun = {aoi, vals, year:document.getElementById('selYear').value, season:document.getElementById('selSeason').value};
+  showResults();
+};
+
+function stats(vals){
+  const s=[...vals].sort((a,b)=>a-b), n=s.length;
+  const mean = s.reduce((a,b)=>a+b,0)/n;
+  return {mean, p10:s[Math.floor(n*.1)], p90:s[Math.floor(n*.9)], n};
+}
+function showResults(){
+  const {aoi, vals, year, season} = state.lastRun;
+  const st = stats(vals);
+  const cellHa = 1; /* 100m cell = 1 ha */
+  const areaHa = Math.round(st.n * ((aoi.bounds[1][0]-aoi.bounds[0][0])*110.57*(aoi.bounds[1][1]-aoi.bounds[0][1])*110.57*Math.cos(aoi.bounds[0][0]*Math.PI/180)*100) / (180*180));
+  const yieldT = st.mean*3.1;  /* plausible link WWP→yield t/ha */
+  const et = state.system==="irrigated" ? 486 : 412;
+  results.classList.add('open');
+  document.getElementById('resSub').textContent = `${aoi.label} · ${season} ${year} · ${state.system}`;
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi hero"><div class="l">Mean wheat water productivity</div>
+      <div class="v">${st.mean.toFixed(2)} <span class="u">kg/m³</span></div>
+      <div class="u">P10–P90: ${st.p10.toFixed(2)} – ${st.p90.toFixed(2)} kg/m³</div></div>
+    <div class="kpi"><div class="l">Predicted yield</div><div class="v">${yieldT.toFixed(1)}</div><div class="u">t/ha (LightGBM)</div></div>
+    <div class="kpi"><div class="l">Seasonal ET</div><div class="v">${et}</div><div class="u">mm</div></div>
+    <div class="kpi"><div class="l">Wheat area analyzed</div><div class="v">${areaHa.toLocaleString()}</div><div class="u">ha</div></div>
+    <div class="kpi"><div class="l">Productivity gap</div><div class="v">${Math.round((1.62-st.mean)/1.62*100)}%</div><div class="u">vs attainable (P95 basin)</div></div>`;
+  drawTrend(st.mean); drawHist(vals); drawFeat();
+  document.getElementById('explainSec').style.display="none";
+}
+document.getElementById('resClose').onclick = ()=>results.classList.remove('open');
+
+/* ───────────────────────── Charts (inline SVG) ───────────────────────── */
+const NS="http://www.w3.org/2000/svg";
+function drawTrend(mean){
+  const svg=document.getElementById('trendChart'); svg.innerHTML="";
+  const yrs=["2021/22","2022/23","2023/24","2024/25","2025/26"];
+  const seed = mean;
+  const data = yrs.map((y,i)=> Math.max(.3, seed + Math.sin(i*2.2+seed*7)*0.11 - (4-i)*0.025));
+  const x0=34,x1=310,y0=96,y1=14, vmin=Math.min(...data)-.08, vmax=Math.max(...data)+.08;
+  const X=i=>x0+(x1-x0)*i/(yrs.length-1), Y=v=>y0-(y0-y1)*(v-vmin)/(vmax-vmin);
+  /* gridlines + labels */
+  for (let g=0; g<3; g++){
+    const v=vmin+(vmax-vmin)*g/2, y=Y(v);
+    svg.innerHTML += `<line x1="${x0}" y1="${y}" x2="${x1}" y2="${y}" stroke="#eceee8"/><text x="${x0-6}" y="${y+3}" font-size="9" fill="#8a988f" text-anchor="end">${v.toFixed(2)}</text>`;
+  }
+  const pts = data.map((v,i)=>`${X(i)},${Y(v)}`).join(" ");
+  svg.innerHTML += `<polyline points="${pts}" fill="none" stroke="#1e6b3f" stroke-width="2.2" stroke-linejoin="round"/>`;
+  data.forEach((v,i)=>{
+    const cur = i===3;
+    svg.innerHTML += `<circle cx="${X(i)}" cy="${Y(v)}" r="${cur?4.5:3}" fill="${cur?"#d9a03f":"#1e6b3f"}" stroke="#fff" stroke-width="1.5"/>
+      <text x="${X(i)}" y="112" font-size="9" fill="#8a988f" text-anchor="middle">${yrs[i]}</text>`;
+  });
+}
+function drawHist(vals){
+  const svg=document.getElementById('histChart'); svg.innerHTML="";
+  const edges=[0,.6,.9,1.2,1.5,99], labels=["<0.6","0.6–0.9","0.9–1.2","1.2–1.5",">1.5"],
+        cols=["#a63603","#e08214","#f7dd72","#a6d96a","#1a7a3c"];
+  const counts=[0,0,0,0,0];
+  vals.forEach(v=>{for(let i=0;i<5;i++) if(v>=edges[i]&&v<edges[i+1]){counts[i]++;break;}});
+  const tot=vals.length, x0=14, bw=56, y0=84;
+  counts.forEach((c,i)=>{
+    const pct=c/tot, h=Math.max(2,pct*62), x=x0+i*(bw+5);
+    svg.innerHTML += `<rect x="${x}" y="${y0-h}" width="${bw}" height="${h}" rx="3" fill="${cols[i]}"/>
+      <text x="${x+bw/2}" y="${y0-h-5}" font-size="9.5" font-weight="700" fill="#33413a" text-anchor="middle">${Math.round(pct*100)}%</text>
+      <text x="${x+bw/2}" y="${y0+13}" font-size="9" fill="#8a988f" text-anchor="middle">${labels[i]}</text>`;
+  });
+  svg.innerHTML += `<text x="160" y="106" font-size="9" fill="#8a988f" text-anchor="middle">kg/m³</text>`;
+}
+function drawFeat(){
+  const svg=document.getElementById('featChart'); svg.innerHTML="";
+  const x0=132, xw=176, rh=13, gap=3.5;
+  FEATURES.forEach((f,i)=>{
+    const y=6+i*(rh+gap), w=xw*f.imp/100;
+    svg.innerHTML += `<text x="${x0-6}" y="${y+rh-3.5}" font-size="9.5" fill="#33413a" text-anchor="end">${f.n}</text>
+      <rect x="${x0}" y="${y}" width="${w}" height="${rh}" rx="2.5" fill="${i<3?"#1e6b3f":"#9fbfa8"}"/>
+      <text x="${x0+w+5}" y="${y+rh-3.5}" font-size="9" fill="#8a988f">${f.imp}</text>`;
+  });
+}
+function drawShap(v, lat, lng){
+  const svg=document.getElementById('shapChart'); svg.innerHTML="";
+  const base = state.system==="irrigated"?1.28:1.00;
+  /* contributions sum to v - base */
+  const raw = [["Seasonal NPP", .55],["Rainfall", .28],["Soil organic carbon", .12],
+               ["Elevation", -.18],["Fertilizer (NPS)", .10],["Planting dekad", -.09],["Improved seed", .07]];
+  const diff = v-base, sraw=raw.reduce((a,b)=>a+b[1],0);
+  const contribs = raw.map(([n,c])=>[n, c*diff/sraw]);
+  const x0=118, xm=x0+90, scale=340;
+  svg.innerHTML += `<text x="${xm}" y="12" font-size="9.5" fill="#8a988f" text-anchor="middle">base ${base.toFixed(2)} → prediction ${v.toFixed(2)} kg/m³</text>
+    <line x1="${xm}" y1="18" x2="${xm}" y2="178" stroke="#dfe4da"/>`;
+  contribs.forEach(([n,c],i)=>{
+    const y=24+i*21, w=Math.min(86,Math.abs(c)*scale), x=c>=0?xm:xm-w;
+    svg.innerHTML += `<text x="${x0-6}" y="${y+10}" font-size="9.5" fill="#33413a" text-anchor="end">${n}</text>
+      <rect x="${x}" y="${y}" width="${Math.max(1.5,w)}" height="14" rx="2.5" fill="${c>=0?"#1e6b3f":"#c2452d"}"/>
+      <text x="${c>=0?x+w+5:x-5}" y="${y+10.5}" font-size="9" font-weight="600" fill="${c>=0?"#1e6b3f":"#c2452d"}" text-anchor="${c>=0?"start":"end"}">${c>=0?"+":""}${c.toFixed(2)}</text>`;
+  });
+  document.getElementById('explainNote').textContent = `Pixel at ${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E — contribution of each feature to this prediction`;
+}
+
+/* ───────────────────────── Pixel inspect ───────────────────────── */
+map.on('click', e=>{
+  if (drawing || !state.lastRun || !rasterLayer) return;
+  const [[s,w],[n,ee]] = state.lastRun.aoi.bounds;
+  const {lat,lng} = e.latlng;
+  if (lat<s||lat>n||lng<w||lng>ee) return;
+  if (state.lastRun.aoi.poly && !pointInPoly([lat,lng], state.lastRun.aoi.poly)) return;
+  const v = wwpAt(lat,lng,state.system);
+  const yld = (v*3.1).toFixed(1);
+  if (clickMarker) map.removeLayer(clickMarker);
+  clickMarker = L.circleMarker([lat,lng],{radius:6,color:"#fff",weight:2,fillColor:"#b07f28",fillOpacity:1}).addTo(map);
+  const pop = L.popup({offset:[0,-4]}).setLatLng([lat,lng]).setContent(
+    `<div class="pop"><h5>Wheat water productivity</h5>
+     <span class="pv">${v.toFixed(2)}</span> <span class="pu">kg/m³</span>
+     <table><tr><td>Predicted yield</td><td>${yld} t/ha</td></tr>
+     <tr><td>Seasonal NPP</td><td>${Math.round(v*920)} kgC/ha</td></tr>
+     <tr><td>Location</td><td>${lat.toFixed(4)}, ${lng.toFixed(4)}</td></tr></table>
+     <a href="#" class="explink" id="explLink">Explain this prediction →</a></div>`
+  ).openOn(map);
+  setTimeout(()=>{
+    const l=document.getElementById('explLink');
+    if(l) l.onclick=(ev)=>{ev.preventDefault();
+      document.getElementById('explainSec').style.display="";
+      drawShap(v, lat, lng);
+      results.classList.add('open');
+      document.getElementById('explainSec').scrollIntoView && document.getElementById('explainSec').closest('.results').scrollTo({top:99999,behavior:"smooth"});
+      map.closePopup();
+    };
+  },50);
+});
+
+/* ───────────────────────── Export ───────────────────────── */
+document.getElementById('csvBtn').onclick = ()=>{
+  if (!state.lastRun) return;
+  const {aoi} = state.lastRun; const [[s,w],[n,e]]=aoi.bounds; const N=60;
+  let csv="lat,lon,wwp_kg_m3,pred_yield_t_ha\n";
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+    const lat=n-(r+.5)/N*(n-s), lng=w+(c+.5)/N*(e-w);
+    if (aoi.poly && !pointInPoly([lat,lng],aoi.poly)) continue;
+    const v=wwpAt(lat,lng,state.system);
+    csv+=`${lat.toFixed(5)},${lng.toFixed(5)},${v.toFixed(3)},${(v*3.1).toFixed(2)}\n`;
+  }
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="wwp_results.csv"; a.click();
+  toast("CSV downloaded");
+};
+document.getElementById('pngBtn').onclick = ()=>toast("Map export will be available after deployment.");
+
+/* ───────────────────────── Modal + misc ───────────────────────── */
+const ABOUT = {
+  method:{t:"Methodology",h:`
+    <p>The Wheat Water Productivity Tool (WWPT) estimates wheat water productivity from FAO WaPOR v3 remote-sensing data at 100 m resolution.</p>
+    <h4>Analytical pipeline</h4>
+    <ol><li>Seasonal Net Primary Production (NPP) is retrieved from WaPOR for the selected season and extent.</li>
+    <li>NPP is converted to above-ground biomass and grain yield using crop-specific harvest index and moisture parameters.</li>
+    <li>Water productivity is computed as grain yield per unit of actual evapotranspiration (kg/m³).</li>
+    <li>A LightGBM regression model, trained on ground data from Oromia and Afar regional states, predicts productivity from biophysical and socioeconomic variables and quantifies the drivers of spatial variability.</li></ol>
+    <h4>Validation</h4>
+    <p>Model outputs are validated against field observations from major wheat-producing areas: irrigated field boundaries, yield records, planting and harvesting dates, and agronomic management practices.</p>`},
+  data:{t:"Data sources",h:`
+    <p><b>FAO WaPOR v3</b> — Net Primary Production, actual evapotranspiration and interception, 100 m, dekadal. Developed with financial support from the Government of the Netherlands.</p>
+    <p><b>Ground observations</b> — field boundaries, yield and production records, and management practices collected by IWMI, EIAR and partners in Oromia and Afar regional states.</p>
+    <p><b>Ancillary layers</b> — CSA administrative boundaries, soil properties (EthioSIS), elevation (SRTM 30 m), and household survey variables.</p>`},
+  guide:{t:"User guide",h:`
+    <ol><li>Select an area of interest: choose an administrative unit, upload a zipped shapefile of your field or scheme boundary, or draw a polygon directly on the map.</li>
+    <li>Choose the production system (rainfed or irrigated) and the season to analyze.</li>
+    <li>Select Run analysis. The tool retrieves WaPOR NPP, computes water productivity at 100 m, and runs the LightGBM prediction model.</li>
+    <li>Explore the map. Click any pixel to see its value and an explanation of the factors driving that prediction.</li>
+    <li>Export results as CSV for further analysis.</li></ol>`},
+  cite:{t:"How to cite",h:`
+    <p>IWMI &amp; EIAR (2026). Wheat Water Productivity Dashboard for Ethiopia. Developed under the WaPOR Phase II project with FAO. Ethiopian Institute of Agricultural Research, Addis Ababa.</p>
+    <p>Data: FAO. WaPOR — Water Productivity through Open access of Remotely sensed derived data, version 3.</p>`},
+  disclaimer:{t:"Disclaimer",h:`
+    <p>This dashboard provides model-based estimates derived from remote sensing and machine learning. Values are indicative and intended for research, planning and advisory purposes. They do not replace field measurement.</p>
+    <p>Administrative boundaries shown do not imply official endorsement. The designations employed do not imply any opinion on the legal status of any country, territory or area.</p>`}
+};
+document.querySelectorAll('[data-about]').forEach(el=>el.onclick=e=>{
+  e.preventDefault();
+  const k=ABOUT[el.dataset.about];
+  document.getElementById('modalTitle').textContent=k.t;
+  document.getElementById('modalBody').innerHTML=k.h;
+  document.getElementById('modal').classList.add('open');
+});
+document.getElementById('modalClose').onclick=()=>document.getElementById('modal').classList.remove('open');
+document.getElementById('modal').onclick=e=>{if(e.target.id==="modal")document.getElementById('modal').classList.remove('open');};
+document.getElementById('langBtn').onclick=()=>{
+  const b=document.getElementById('langBtn');
+  b.textContent = b.textContent.startsWith("EN")?"አማ ▾":"EN ▾";
+  toast(b.textContent.startsWith("አማ")?"Amharic interface is planned for deployment.":"Language: English");
+};
+let toastT;
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'), 2600);
+}
+</script>
+</body>
+</html>
