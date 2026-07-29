@@ -209,7 +209,9 @@ for (const [w, h, label] of [[1600, 950, 'desktop'], [1280, 800, 'laptop'], [900
 
 console.log('\n11. Console cleanliness')
 // The 422 is the deliberate bad-upload rejection from step 7, not a defect.
-const real = errors.filter((e) => !/tile\.openstreetmap|ERR_|net::|favicon|422 \(Unprocessable/i.test(e))
+// HTTP/2 carries no reason phrase, so a deployed origin reports "422 ()" while a
+// local HTTP/1.1 server reports "422 (Unprocessable Entity)" — match either.
+const real = errors.filter((e) => !/tile\.openstreetmap|ERR_|net::|favicon|status of 422/i.test(e))
 check('no JS console errors', real.length === 0, real.slice(0, 3).join(' | '))
 if (errors.length !== real.length) {
   console.log(`  note: ${errors.length - real.length} network/tile error(s) ignored (offline map tiles)`)

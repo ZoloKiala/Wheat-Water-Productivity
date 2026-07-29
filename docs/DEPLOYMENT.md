@@ -32,22 +32,48 @@ injects.
 
 ## First deploy — staging
 
-The Railway CLI needs an interactive browser login, so run these yourself:
+The Railway CLI needs an interactive browser login for `railway login`; the rest
+runs unattended. **Commands below are PowerShell** (the project's development
+environment); bash equivalents follow in the next section.
 
-```bash
+```powershell
 npm install -g @railway/cli
 railway login                      # opens a browser
 
-railway init                       # create the project, name it e.g. wwp-dashboard
-railway environment new staging    # or use the default and rename it
+railway init                       # creates the project
+railway environment new staging
 railway environment staging
+railway add --service wwp-dashboard
 
-# Fail-closed by default: set a token only when EIAR needs retraining enabled.
-railway variables --set "WWP_ADMIN_TOKEN=$(openssl rand -hex 24)"
-
-railway up                         # builds the Dockerfile and deploys
+railway up --service wwp-dashboard --environment staging
 railway domain                     # mint a public URL
 ```
+
+Model management stays disabled until you set a token. Generate and set one only
+when EIAR needs retraining enabled — this prints nothing to the terminal:
+
+```powershell
+$tok = -join ((1..32) | ForEach-Object { '{0:x}' -f (Get-Random -Max 16) })
+railway variables --set "WWP_ADMIN_TOKEN=$tok" --service wwp-dashboard
+$env:WWP_ADMIN_TOKEN = $tok        # so the test suites can use it
+```
+
+### bash / zsh equivalents
+
+```bash
+railway variables --set "WWP_ADMIN_TOKEN=$(openssl rand -hex 24)" --service wwp-dashboard
+export WWP_ADMIN_TOKEN=...         # PowerShell uses $env:NAME = "..." instead
+```
+
+Setting an environment variable is the one place the two shells differ enough to
+trip you up:
+
+| | PowerShell | bash / zsh |
+|---|---|---|
+| Set a variable | `$env:WWP_BASE = "https://host"` | `export WWP_BASE=https://host` |
+| Read it back | `$env:WWP_BASE` | `$WWP_BASE` |
+
+PowerShell has no `export`, and **no spaces around the `=`**.
 
 Railway reads `railway.json`, which pins the Dockerfile builder, sets the health
 check to `/api/health` with a 300 s timeout (the image build trains the model, so
