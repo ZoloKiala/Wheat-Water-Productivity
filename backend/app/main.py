@@ -8,8 +8,9 @@ whole application: ``uvicorn app.main:app`` from the backend directory.
 import os
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .api import router
@@ -44,6 +45,17 @@ app.add_middleware(
 app.include_router(router, prefix="/api")
 
 
+# Unknown API paths must answer in JSON. Without this catch-all they would
+# fall through to the SPA mount below and come back as the HTML 404 page.
+@app.api_route(
+    "/api/{_path:path}",
+    methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+    include_in_schema=False,
+)
+async def _api_not_found(_path: str):
+    raise HTTPException(status_code=404, detail="Not Found")
+
+
 @app.on_event("startup")
 def _load_model():
     MODEL.load_or_train()
@@ -51,4 +63,15 @@ def _load_model():
 
 DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 if DIST.exists():
+    # html=True also serves dist/404.html (from frontend/public) with a 404
+    # status for paths that match no file, so browsers get a branded page.
     app.mount("/", StaticFiles(directory=str(DIST), html=True), name="dashboard")
+
+
+@app.exception_handler(Exception)
+async def _unhandled_error(request: Request, exc: Exception):
+    """Browser navigations get the branded 500 page; API calls stay JSON."""
+    page = DIST / "500.html"
+    if not request.url.path.startswith("/api") and page.exists():
+        return FileResponse(page, status_code=500)
+    return JSONResponse({"detail": "Internal Server Error"}, status_code=500)
