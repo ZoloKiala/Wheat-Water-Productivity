@@ -16,6 +16,11 @@ tests/screenshots/
 tests/node_modules/
 tests/package*.json
 
+# Documentation build (the PDFs themselves are committed as deliverables)
+docs/node_modules/
+docs/package*.json
+docs/pdf/*.html
+
 # Office lock files and OS cruft
 ~$*
 Thumbs.db

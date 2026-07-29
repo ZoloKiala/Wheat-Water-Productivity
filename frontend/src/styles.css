@@ -10,6 +10,8 @@
   --wwp-1:#93bd82; --wwp-2:#6ba763; --wwp-3:#458b4b; --wwp-4:#297038; --wwp-5:#0f4d26;
   --pos:#d97a1e; --neg:#1f6f9c;
   --grid:#eceee8;
+  /* Chrome heights — .app sizes itself from these. */
+  --hdr-h:58px; --ftr-h:34px;
 }
 *{box-sizing:border-box; margin:0; padding:0}
 html,body{height:100%}
@@ -22,7 +24,7 @@ select,input{font-family:inherit}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
 /* ── Header ── */
-.hdr{background:var(--green-900); color:#fff; height:58px; display:flex; align-items:center; gap:20px; padding:0 20px; flex-shrink:0}
+.hdr{background:var(--green-900); color:#fff; height:var(--hdr-h); display:flex; align-items:center; gap:20px; padding:0 20px; flex-shrink:0}
 .brand{display:flex; align-items:center; gap:11px}
 .brand .mark{width:36px;height:36px;border-radius:8px;background:linear-gradient(140deg,var(--green-600),var(--green-800));display:grid;place-items:center;border:1px solid rgba(255,255,255,.25)}
 .brand .t1{font-size:15px;font-weight:800;letter-spacing:.01em;line-height:1.15}
@@ -34,11 +36,11 @@ select,input{font-family:inherit}
 .hdr .right{margin-left:auto;display:flex;align-items:center;gap:10px}
 .lang{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;font-size:12px;font-weight:600;padding:5px 12px}
 .lang:hover{background:rgba(255,255,255,.12)}
-.crumb{background:#fff;border-bottom:1px solid var(--line);padding:7px 20px;font-size:12px;color:var(--muted);flex-shrink:0}
-.crumb b{color:var(--ink);font-weight:600}
-
-/* ── Layout ── */
-.app{display:flex; height:calc(100vh - 58px - 31px - 34px)}
+/* ── Layout ──
+   The three panes fill whatever the header and footer leave behind. Deriving
+   that from the same tokens the header and footer use keeps the panes from
+   drifting out of the viewport when either bar changes height. */
+.app{display:flex; height:calc(100vh - var(--hdr-h) - var(--ftr-h))}
 .side{width:308px;flex-shrink:0;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow-y:auto}
 .mapwrap{flex:1;position:relative;min-width:0}
 #map{position:absolute;inset:0;background:#dfe8dc}
@@ -147,7 +149,7 @@ select,input{font-family:inherit}
 .modal .mb li{margin-bottom:5px}
 
 /* ── Footer ── */
-.ftr{height:34px;background:#fff;border-top:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 20px;font-size:11px;color:var(--muted);flex-shrink:0}
+.ftr{height:var(--ftr-h);background:#fff;border-top:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 20px;font-size:11px;color:var(--muted);flex-shrink:0}
 .ftr .dot{width:3px;height:3px;border-radius:50%;background:var(--line-2)}
 .ftr button{border:0;background:transparent;color:var(--green-700);font-size:11px;font-weight:600;padding:0}
 .ftr button:hover{text-decoration:underline}

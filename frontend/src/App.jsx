@@ -292,8 +292,6 @@ export default function App() {
         </div>
       </header>
 
-      <div className="crumb">eiar.gov.et › Research tools › <b>Wheat Water Productivity Dashboard</b></div>
-
       <div className="app">
         {/* ───────── Sidebar ───────── */}
         <aside className="side" aria-label="Analysis controls">
