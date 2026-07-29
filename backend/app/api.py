@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import secrets
 from typing import Optional
 
 from fastapi import APIRouter, File, Header, HTTPException, Query, UploadFile
@@ -126,8 +128,32 @@ def model_info():
     return MODEL.info()
 
 
+def _require_admin(token: Optional[str]) -> None:
+    """Guard the model-management routes.
+
+    A successful retrain replaces the model the service is answering with, so
+    this must never be open to the internet. The route is disabled unless
+    WWP_ADMIN_TOKEN is configured, which means a deployment that forgets to set
+    it fails closed rather than exposing model replacement.
+    """
+    expected = os.environ.get("WWP_ADMIN_TOKEN", "")
+    if not expected:
+        raise HTTPException(
+            503,
+            "Model management is disabled. Set WWP_ADMIN_TOKEN on the service to "
+            "enable it.",
+        )
+    if not token or not secrets.compare_digest(token, expected):
+        raise HTTPException(401, "A valid X-Admin-Token header is required.")
+
+
 @router.post("/model/retrain")
-async def model_retrain(file: UploadFile = File(...), force: bool = False):
+async def model_retrain(
+    file: UploadFile = File(...),
+    force: bool = False,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    _require_admin(x_admin_token)
     content = await file.read()
     try:
         return MODEL.retrain_from_csv(content, force=force)

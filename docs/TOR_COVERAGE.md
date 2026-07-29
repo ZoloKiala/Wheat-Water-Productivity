@@ -14,7 +14,7 @@ says where the work lives or why it is out of scope for a software build.
 | 4 | LightGBM deployed as a prediction service | Done — `model_service.py`, `/api/predict`, `/api/explain` |
 | 5 | Scalable spatial database for inputs, artifacts and outputs | **Partial** — model artifacts are versioned on disk; upload registry and run store are in-memory. See below. |
 | 6 | Integration into the EIAR web platform | Build-side done — relative-base bundle, sub-path safe, EIAR identity applied. Coordination with EIAR IT/GIS is an engagement activity. |
-| 7 | System testing and quality assurance | Done — 102 automated checks across `tests/` |
+| 7 | System testing and quality assurance | Done — 104 automated checks across `tests/` |
 | 8 | Technical documentation | Done — README, ARCHITECTURE, generated OpenAPI at `/docs` |
 | 9 | Train EIAR staff | Out of scope for a software build — delivery activity |
 
@@ -55,7 +55,8 @@ signed per-prediction breakdown from LightGBM's exact tree-path SHAP values.
 
 **WP5 — Website integration.** The bundle builds with a relative base so it
 deploys under any sub-path behind a reverse proxy, and the backend can serve it
-directly. All five required supporting pages are written and reachable from the
+directly. A `Dockerfile` and `railway.json` package the whole application for
+container hosting — see [DEPLOYMENT.md](DEPLOYMENT.md). All five required supporting pages are written and reachable from the
 header and footer: methodology, data sources, user guide, how to cite, and
 disclaimer. **Web analytics (GA4) is not wired up** — it needs EIAR's property ID
 and a decision on consent handling, so it is left as a one-file addition rather
@@ -88,10 +89,12 @@ infrastructure:
 5. **GA4 analytics**, pending EIAR's property ID and consent approach.
 6. **Amharic localization.** The language toggle is present but reports that the
    Amharic interface is planned; the UI strings are not yet externalized.
-7. **Authentication**, if EIAR wants the retrain and model-management routes
-   restricted. `POST /api/model/retrain` is currently unauthenticated and will
-   replace the serving model on a successful upload — this should be protected
-   before the service is publicly reachable.
+7. **Broader authentication**, if EIAR wants the analysis routes restricted.
+   Model management is already protected: `POST /api/model/retrain` requires an
+   `X-Admin-Token` matching `WWP_ADMIN_TOKEN` and is disabled outright when that
+   variable is unset, so a deployment fails closed rather than exposing model
+   replacement. The read and analysis routes remain open, which suits a public
+   research tool but would need a gateway if EIAR wants them restricted.
 8. **Map PNG export.** CSV export is implemented; the prototype's "Save map (PNG)"
    button is not, since a faithful map export needs server-side tile composition.
    The button was removed rather than left as a control that does nothing.
@@ -100,9 +103,11 @@ infrastructure:
 
 | Suite | Checks | Covers |
 |---|---|---|
-| `tests/test_api_e2e.py` | 47 | All three AOI journeys, caching, idempotency, prediction, explanation, CSV export, and 11 validation/error paths |
+| `tests/test_api_e2e.py` | 49 | All three AOI journeys, caching, idempotency, prediction, explanation, CSV export, model-management auth, and 11 validation/error paths |
 | `tests/test_retrain.py` | 4 | Retrain, holdout comparison, promotion, continued serving |
 | `tests/test_ui.mjs` | 51 | Rendering, chart integrity, label overflow, table views, results-panel open/close and map re-sync, pixel inspect, both polygon-finish paths, content pages, four viewport widths, console cleanliness |
 
-All 102 pass against the current build, verified from a clean state (model
-directory deleted, so the run also covers first-boot training).
+All 104 pass against the current build, verified from a clean state (model
+directory deleted, so the run also covers first-boot training). The API suite
+reports 46 when `WWP_ADMIN_TOKEN` is unset — it then asserts model management is
+disabled instead of exercising the authorized paths.

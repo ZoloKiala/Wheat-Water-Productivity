@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import threading
 import time
 from pathlib import Path
@@ -30,7 +31,12 @@ from .geodata import (
     feature_matrix,
 )
 
-MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
+# Container filesystems are ephemeral, so a model retrained in a deployment is
+# lost on the next restart unless WWP_MODELS_DIR points at a mounted volume.
+MODELS_DIR = Path(
+    os.environ.get("WWP_MODELS_DIR")
+    or Path(__file__).resolve().parent.parent / "models"
+)
 
 LGB_PARAMS = {
     "objective": "regression",

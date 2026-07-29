@@ -5,6 +5,7 @@ Serves the REST API under /api and, when the frontend has been built
 whole application: ``uvicorn app.main:app`` from the backend directory.
 """
 
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -25,9 +26,17 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# The dashboard is served from this same origin in a deployment, so CORS only
+# matters for the Vite dev server and for embedding the API cross-origin.
+# WWP_CORS_ORIGINS is a comma-separated allowlist.
+_origins = os.environ.get("WWP_CORS_ORIGINS")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=(
+        [o.strip() for o in _origins.split(",") if o.strip()]
+        if _origins
+        else ["http://localhost:5173", "http://127.0.0.1:5173"]
+    ),
     allow_methods=["*"],
     allow_headers=["*"],
 )

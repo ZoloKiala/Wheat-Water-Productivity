@@ -26,6 +26,8 @@ const DOCS = [
     title: 'System Architecture', subtitle: 'Wheat Water Productivity Dashboard' },
   { src: join(HERE, 'TOR_COVERAGE.md'), out: 'WWP-Dashboard-ToR-Coverage.pdf',
     title: 'Terms of Reference Coverage', subtitle: 'Wheat Water Productivity Dashboard' },
+  { src: join(HERE, 'DEPLOYMENT.md'), out: 'WWP-Dashboard-Deployment.pdf',
+    title: 'Deployment Guide', subtitle: 'Wheat Water Productivity Dashboard' },
 ]
 
 const ORG = 'Ethiopian Institute of Agricultural Research · IWMI East Africa · FAO WaPOR Phase II'
@@ -100,6 +102,8 @@ const LINK_MAP = {
   'docs/ARCHITECTURE.md': { file: 'WWP-Dashboard-Architecture.pdf', name: 'the Architecture document' },
   'TOR_COVERAGE.md': { file: 'WWP-Dashboard-ToR-Coverage.pdf', name: 'the ToR Coverage document' },
   'docs/TOR_COVERAGE.md': { file: 'WWP-Dashboard-ToR-Coverage.pdf', name: 'the ToR Coverage document' },
+  'DEPLOYMENT.md': { file: 'WWP-Dashboard-Deployment.pdf', name: 'the Deployment Guide' },
+  'docs/DEPLOYMENT.md': { file: 'WWP-Dashboard-Deployment.pdf', name: 'the Deployment Guide' },
 }
 
 function rewriteLinks(html) {
@@ -112,7 +116,7 @@ function rewriteLinks(html) {
     // place. Prose labels like "the work-package mapping" are left alone.
     const label = /\.md$/.test(text.trim())
       ? hit.name
-      : text.replace(/(?:docs\/)?(?:README|ARCHITECTURE|TOR_COVERAGE)\.md/g, hit.name)
+      : text.replace(/(?:docs\/)?(?:README|ARCHITECTURE|TOR_COVERAGE|DEPLOYMENT)\.md/g, hit.name)
     return `<a href="${hit.file}${hash ? '#' + hash : ''}">${label}</a>`
   })
 }

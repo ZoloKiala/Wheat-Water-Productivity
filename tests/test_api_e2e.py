@@ -42,7 +42,7 @@ def req(path, data=None, headers=None, method=None, raw=False):
             return e.code, payload
 
 
-def multipart(path, filename, content, field="file"):
+def multipart(path, filename, content, field="file", headers=None):
     boundary = "----wwpBoundary1234"
     body = (
         f"--{boundary}\r\nContent-Disposition: form-data; name=\"{field}\"; "
@@ -50,7 +50,8 @@ def multipart(path, filename, content, field="file"):
     ).encode() + content + f"\r\n--{boundary}--\r\n".encode()
     r = urllib.request.Request(
         BASE + path, data=body,
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}",
+                 **(headers or {})},
     )
     try:
         with urllib.request.urlopen(r, timeout=180) as resp:
@@ -212,13 +213,28 @@ check("extent too large 422", s == 422, str(m.get("detail"))[:60])
 s, m = req("/api/predict?lat=88&lon=39.2")
 check("out-of-range lat 422", s == 422)
 
-print("\n11. Retrain workflow")
-s, m = multipart("/api/model/retrain", "tiny.csv",
-                 b"npp,rainfall,aet,soc,elevation,fertilizer,planting_dekad,improved_seed,"
-                 b"extension_visits,market_dist,wwp\n800,700,400,1.3,2300,90,4,1,2,15,1.0\n")
-check("retrain too few rows 422", s == 422, str(m.get("detail"))[:60])
-s, m = multipart("/api/model/retrain", "wrong.csv", b"a,b,c\n1,2,3\n")
-check("retrain missing columns 422", s == 422, str(m.get("detail"))[:70])
+print("\n11. Model management is protected")
+TINY = (b"npp,rainfall,aet,soc,elevation,fertilizer,planting_dekad,improved_seed,"
+        b"extension_visits,market_dist,wwp\n800,700,400,1.3,2300,90,4,1,2,15,1.0\n")
+ADMIN = os.environ.get("WWP_ADMIN_TOKEN", "")
+
+s, m = multipart("/api/model/retrain", "tiny.csv", TINY)
+if ADMIN:
+    check("retrain without a token is rejected", s == 401, str(m.get("detail"))[:60])
+    s, m = multipart("/api/model/retrain", "tiny.csv", TINY, headers={"X-Admin-Token": "wrong"})
+    check("retrain with a wrong token is rejected", s == 401, str(m.get("detail"))[:60])
+    # Authorized requests reach validation.
+    hdr = {"X-Admin-Token": ADMIN}
+    s, m = multipart("/api/model/retrain", "tiny.csv", TINY, headers=hdr)
+    check("authorized retrain too few rows 422", s == 422, str(m.get("detail"))[:60])
+    s, m = multipart("/api/model/retrain", "wrong.csv", b"a,b,c\n1,2,3\n", headers=hdr)
+    check("authorized retrain missing columns 422", s == 422, str(m.get("detail"))[:70])
+else:
+    # Fails closed: a deployment that forgets the token cannot replace the model.
+    check("retrain disabled when no token is configured", s == 503,
+          str(m.get("detail"))[:70])
+    print("     (set WWP_ADMIN_TOKEN on the server and in this env to test the "
+          "authorized paths)")
 
 print("\n12. SPA is served")
 s, html = req("/", raw=True)

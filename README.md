@@ -78,13 +78,27 @@ frontend/
     api.js             Backend client with typed error messages
     styles.css         EIAR visual identity and layout
 tests/
-  test_api_e2e.py      47 API checks: journeys, caching, validation, errors
+  test_api_e2e.py      49 API checks: journeys, caching, validation, auth, errors
   test_retrain.py      Model retrain-and-promote workflow
   test_ui.mjs          51 browser checks: rendering, interaction, responsive layout
 docs/
-  ARCHITECTURE.md      System design, data flow, API reference, deployment
+  ARCHITECTURE.md      System design, data flow, API reference
+  DEPLOYMENT.md        Railway deployment, staging → production, env vars
   TOR_COVERAGE.md      Work-package coverage and what deployment still needs
+  build_pdf.mjs        Renders the documentation to docs/pdf/*.pdf
+Dockerfile             Two-stage build; trains the model into the image
+railway.json           Railway builder, health check, single-replica pin
 ```
+
+## Deploying
+
+`Dockerfile` builds the whole application — frontend bundle, backend, and a
+trained model baked in — and binds `$PORT`. See
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the Railway staging-then-production
+walkthrough and the environment variables.
+
+Note that `POST /api/model/retrain` is **disabled unless `WWP_ADMIN_TOKEN` is
+set**, so a deployment cannot accidentally expose model replacement.
 
 ## API
 
@@ -108,15 +122,17 @@ All routes are under `/api`. Interactive documentation is generated at
 Start the backend first, then:
 
 ```bash
-python tests/test_api_e2e.py     # 47 API checks
-python tests/test_retrain.py     # retrain-and-promote workflow
+python tests/test_api_e2e.py     # 49 API checks (46 without WWP_ADMIN_TOKEN)
+python tests/test_retrain.py     # retrain workflow; needs WWP_ADMIN_TOKEN
 
 cd tests
 npm install playwright && npx playwright install chromium
 node test_ui.mjs                 # 51 browser checks, writes screenshots/
 ```
 
-Point any suite at a different host with `WWP_BASE=http://host:port`.
+Point any suite at a different host with `WWP_BASE=http://host:port` — including
+a deployed staging URL, which makes the API suite a real smoke test rather than a
+liveness ping.
 
 ## Data sources
 

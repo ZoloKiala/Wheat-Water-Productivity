@@ -14,6 +14,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 from app.geodata import FEATURE_NAMES, PROVIDER, feature_matrix
 
 
+ADMIN = os.environ.get("WWP_ADMIN_TOKEN")
+if not ADMIN:
+    raise SystemExit(
+        "WWP_ADMIN_TOKEN must be set both on the server and in this environment "
+        "to exercise the retrain workflow (model management fails closed without it)."
+    )
+
+
 def multipart(path, filename, content):
     boundary = "----wwpB"
     body = (
@@ -21,7 +29,8 @@ def multipart(path, filename, content):
         f"filename=\"{filename}\"\r\nContent-Type: text/csv\r\n\r\n"
     ).encode() + content + f"\r\n--{boundary}--\r\n".encode()
     r = urllib.request.Request(BASE + path, data=body,
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}",
+                 "X-Admin-Token": ADMIN})
     try:
         with urllib.request.urlopen(r, timeout=600) as resp:
             return resp.status, json.loads(resp.read())
