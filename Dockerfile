@@ -1,0 +1,39 @@
+# WWP dashboard: FastAPI server + the single-file dashboard it serves.
+#
+# rasterio and rioxarray ship manylinux wheels with GDAL bundled, so no apt-get
+# GDAL is needed — which keeps the image small and the build reproducible.
+FROM python:3.11-slim AS runtime
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+# curl serves the platform health check.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Requirements first, so dependency layers cache until they actually change.
+COPY server/requirements.txt server/requirements-wapor.txt ./server/
+RUN pip install --no-cache-dir -r server/requirements-wapor.txt
+
+COPY server/ ./server/
+COPY Data/ ./Data/
+COPY wheat_dashboard.html ./
+
+# FAO WaPOR v3 is the only source of numbers; there is no synthetic fallback.
+# The cache lives outside the read-only app tree so a volume can hold it.
+ENV WWP_CACHE_DIR=/tmp/wwp-cache
+
+# Fail the build rather than ship an image whose chain disagrees with the
+# reference notebook. Costs a second and catches a bad edit to the estimation
+# chain or the crop parameters before it can reach a deployment.
+RUN python server/selftest.py
+
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+  CMD curl -fsS "http://127.0.0.1:${PORT:-8000}/api/health" || exit 1
+
+CMD ["python", "server/run.py"]

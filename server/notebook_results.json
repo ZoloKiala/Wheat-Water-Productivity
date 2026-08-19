@@ -1,0 +1,109 @@
+{
+  "_source": "ETH_WWP_WaPORv3_Irrigaed_Wheat_2026_Final.ipynb \u2014 boundary results (cell 17) and point-group medians (cell 27)",
+  "fields": {
+    "1": {
+      "NPP": 184.95,
+      "EYield_tpha": 1.78,
+      "AETI_mm": 297.32,
+      "WP_kgpm3": 0.6,
+      "LGP": 90
+    },
+    "2": {
+      "NPP": 168.7,
+      "EYield_tpha": 1.62,
+      "AETI_mm": 319.43,
+      "WP_kgpm3": 0.51,
+      "LGP": 116
+    },
+    "3": {
+      "NPP": 138.29,
+      "EYield_tpha": 1.33,
+      "AETI_mm": 291.45,
+      "WP_kgpm3": 0.46,
+      "LGP": 116
+    },
+    "4": {
+      "NPP": 65.24,
+      "EYield_tpha": 0.63,
+      "AETI_mm": 193.81,
+      "WP_kgpm3": 0.32,
+      "LGP": 116
+    },
+    "5": {
+      "NPP": 478.22,
+      "EYield_tpha": 4.59,
+      "AETI_mm": 369.28,
+      "WP_kgpm3": 1.24,
+      "LGP": 121
+    },
+    "6": {
+      "NPP": 319.52,
+      "EYield_tpha": 3.07,
+      "AETI_mm": 219.53,
+      "WP_kgpm3": 1.4,
+      "LGP": 96
+    }
+  },
+  "point_groups": {
+    "Amibara|1": {
+      "n": 5,
+      "SOS": "2025-11-22",
+      "EOS": "2026-02-20",
+      "LGP": 90,
+      "NPP": 206.91,
+      "AETI_mm": 319.0,
+      "EYield_tpha": 1.99,
+      "WP_kgpm3": 0.62
+    },
+    "Dubti|2": {
+      "n": 21,
+      "SOS": "2025-11-20",
+      "EOS": "2026-03-16",
+      "LGP": 116,
+      "NPP": 197.57,
+      "AETI_mm": 329.9,
+      "EYield_tpha": 1.9,
+      "WP_kgpm3": 0.59
+    },
+    "Dubti|3": {
+      "n": 17,
+      "SOS": "2025-11-20",
+      "EOS": "2026-03-16",
+      "LGP": 116,
+      "NPP": 146.32,
+      "AETI_mm": 322.5,
+      "EYield_tpha": 1.4,
+      "WP_kgpm3": 0.36
+    },
+    "Dodota|4": {
+      "n": 6,
+      "SOS": "2025-12-11",
+      "EOS": "2026-04-01",
+      "LGP": 111,
+      "NPP": 556.48,
+      "AETI_mm": 378.4,
+      "EYield_tpha": 5.34,
+      "WP_kgpm3": 1.4
+    },
+    "Godino|5": {
+      "n": 2,
+      "SOS": "2025-12-07",
+      "EOS": "2026-03-13",
+      "LGP": 96,
+      "NPP": 425.89,
+      "AETI_mm": 280.2,
+      "EYield_tpha": 4.09,
+      "WP_kgpm3": 1.46
+    },
+    "Dodota|6": {
+      "n": 6,
+      "SOS": "2024-12-21",
+      "EOS": "2025-04-02",
+      "LGP": 102,
+      "NPP": 467.68,
+      "AETI_mm": 358.85,
+      "EYield_tpha": 4.49,
+      "WP_kgpm3": 1.24
+    }
+  }
+}

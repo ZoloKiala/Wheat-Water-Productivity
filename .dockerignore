@@ -1,0 +1,8 @@
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+server/.cache
+wwp/
+*.docx
+*.ipynb
