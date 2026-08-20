@@ -21,7 +21,7 @@ RUN pip install --no-cache-dir -r server/requirements-wapor.txt
 
 COPY server/ ./server/
 COPY Data/ ./Data/
-COPY wheat_dashboard.html ./
+COPY wheat_dashboard.html 404.html 500.html ./
 
 # FAO WaPOR v3 is the only source of numbers; there is no synthetic fallback.
 # The cache lives outside the read-only app tree so a volume can hold it.

@@ -45,6 +45,7 @@ about **2 to 3 minutes**. Results are cached, so a repeat is immediate.
 | `server/wapor.py` | WaPOR retrieval and seasonal aggregation — the analysis logic |
 | `server/cache.py` | result cache and idempotency keys |
 | `server/geocode.py` | place search, proxied and throttled |
+| `404.html`, `500.html` | branded, self-contained error pages |
 | `server/run.py` | launcher: dual-stack bind, port handling, `--check` |
 | `server/selftest.py` | offline checks for the analysis logic |
 | `Data/` | the 2026 irrigated-wheat survey layers |
@@ -63,7 +64,9 @@ Against `ToR_Dashboard_Developer.docx`:
 | WP2 — inputs by shapefile upload **and** other sources | done: `.shp`+`.dbf`, all sidecars, zipped shapefile, GeoJSON, draw, place search |
 | WP2 — client **and** server-side validation with informative errors | done: attribute rules and area limits enforced on both sides |
 | WP3 — package the Python tool behind a stable API | done: `/api/estimate`, `/api/survey`, `/api/method`, `/api/wapor/check` |
-| WP3 — caching for repeated queries, idempotency keys | done: `server/cache.py`, `Idempotency-Key` header |
+| WP3 — caching for repeated queries, idempotency keys | done: `server/cache.py`, `Idempotency-Key` header — 197 s cold, 0 s warm |
+| WP2 — responsive on small screens | done: map overlays reflow at 760px and 560px; verified 380–1440px |
+| WP5 — branded error pages | done: `404.html`, `500.html`, HTML for browsers and JSON for API clients |
 | WP3 — WaPOR data access layer, on-the-fly NPP retrieval | done: `server/wapor.py` |
 | WP5 — supporting pages: purpose, methodology, data sources, guidance, citation, disclaimer | in the dashboard's Method & data and Help dialogs |
 | WP2 — charting library (Plotly, ECharts or D3) | **not met**: charts are hand-authored SVG/CSS, no library |

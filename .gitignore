@@ -1,7 +1,13 @@
+# caches and build leftovers
 __pycache__/
 *.pyc
 server/.cache/
 .venv/
 node_modules/
+
+# Design-canvas working directory: the .dc.html canvas plus ~1.4 MB of pasted
+# screenshots. Design source, not application source.
 wwp/
+
+# Contract documents stay out of a public repo.
 *.docx

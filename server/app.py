@@ -33,12 +33,16 @@ from typing import Any, Literal, Optional
 
 from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.requests import Request
 from pydantic import BaseModel, Field, field_validator
 
 ROOT = Path(__file__).resolve().parent.parent
 DASHBOARD = ROOT / "wheat_dashboard.html"
 DATA = ROOT / "Data"
+PAGE_404 = ROOT / "404.html"
+PAGE_500 = ROOT / "500.html"
 
 # FAO (2020b) reference values for wheat, as used by the reference notebook.
 CROP = {"AOT": 0.85, "fc": 0.90, "mc": 0.15, "hi": 0.48}
@@ -424,6 +428,20 @@ def api_geocode(
         raise HTTPException(502, f"place search failed: {type(exc).__name__}: {exc}") from exc
 
 
+@app.get("/api/boom", include_in_schema=False)
+@app.get("/boom", include_in_schema=False)
+def _boom() -> None:
+    """Raise on purpose, so both 500 branches can be exercised.
+
+    Registered on an /api path and a plain one, because the two answer
+    differently by design: JSON for API clients, the branded page for a browser.
+    Off unless WWP_ALLOW_BOOM is set, so it cannot be reached in a deployment.
+    """
+    if os.environ.get("WWP_ALLOW_BOOM", "").lower() not in {"1", "true", "yes"}:
+        raise HTTPException(404, "Not Found")
+    raise RuntimeError("deliberate failure for error-page testing")
+
+
 @app.get("/api/cache")
 def api_cache() -> dict[str, Any]:
     """What the result and idempotency caches are holding."""
@@ -499,6 +517,36 @@ def estimate(
     if idempotency_key:
         cache.put_idempotent(idempotency_key, [e.model_dump() for e in out])
     return out
+
+
+def _wants_html(request: Request) -> bool:
+    """A browser navigation, as opposed to an API call.
+
+    Keyed on the Accept header rather than the path, so `curl /nope` still gets
+    JSON it can parse while a person typing the same URL gets a readable page.
+    Anything under /api always answers in JSON.
+    """
+    if request.url.path.startswith("/api"):
+        return False
+    return "text/html" in (request.headers.get("accept") or "")
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _http_error(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 404 and _wants_html(request) and PAGE_404.exists():
+        return FileResponse(PAGE_404, status_code=404, media_type="text/html")
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code,
+                        headers=getattr(exc, "headers", None))
+
+
+@app.exception_handler(Exception)
+async def _unhandled_error(request: Request, exc: Exception):
+    """Never leak a traceback to the client; the log keeps the detail."""
+    print(f"[wwp] unhandled error on {request.method} {request.url.path}: "
+          f"{type(exc).__name__}: {exc}", flush=True)
+    if _wants_html(request) and PAGE_500.exists():
+        return FileResponse(PAGE_500, status_code=500, media_type="text/html")
+    return JSONResponse({"detail": "Internal Server Error"}, status_code=500)
 
 
 @app.get("/")

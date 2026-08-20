@@ -81,6 +81,32 @@ Mirror mode reproduces the published numbers, which confirms the chain — URL
 construction, `scale_factor`, day-weighting, clip, sum-then-mean — and shows the
 notebook's figures carry the decade defect described below.
 
+## Caching and idempotency (ToR WP3)
+
+Retrieval is slow, so two mechanisms keep it from being paid twice.
+
+**Result cache** — keyed on geometry (rounded to ~0.1 m), season, scheme code and
+decade mode. Renaming a plot does not invalidate it, because the label does not
+change the answer. Measured on the Amibara field: **197 s cold, 0 s warm**.
+
+**Idempotency keys** — send `Idempotency-Key: <value>` and a retried POST replays
+the first response instead of starting a second retrieval. Two callers asking the
+same question share the result cache but never each other's idempotency entry.
+
+Both persist as JSON under `WWP_CACHE_DIR` and are safe to delete at any time
+(`DELETE /api/cache`).
+
+## Error pages
+
+`404.html` and `500.html` carry the EIAR identity and are self-contained, so they
+render even if the app that failed took its own assets with it. Which one you get
+depends on the caller, not the path: a browser navigation (`Accept: text/html`)
+gets the page, anything under `/api` or any client that did not ask for HTML gets
+JSON. Tracebacks never reach the client; the service log keeps the detail.
+
+`/boom` and `/api/boom` raise on purpose so both branches can be exercised. They
+answer 404 unless `WWP_ALLOW_BOOM=1`, so they are inert in a deployment.
+
 ## Area limits
 
 Enforced in the page and again in the API, so a feature the data cannot support is
@@ -101,6 +127,8 @@ estimate as a `warning` field and surface in the panel.
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/` | The dashboard |
+| `GET` | `/api/geocode?q=` | Place search: a coordinate pair, or a name via Nominatim |
+| `GET`, `DELETE` | `/api/cache` | What the caches hold; DELETE empties them |
 | `GET` | `/api/health` | `provider`, `synthetic`, and any `wapor_error` |
 | `GET` | `/api/method` | Crop parameters, equations, WaPOR mapsets |
 | `GET` | `/api/survey` | The 2026 fields and 57 monitoring points with the notebook's published results |
