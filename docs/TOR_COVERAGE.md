@@ -1,3 +1,5 @@
+> **Superseded.** This document describes the React `frontend/` + `backend/` application that was replaced by the single-file dashboard and `server/`. Kept for reference; the architecture it describes no longer ships. The previous tree is preserved on branch `snapshot/pre-replace-2026-08-20`.
+
 # ToR coverage
 
 How this build maps to `ToR_Dashboard_Developer.docx`, and — as importantly —

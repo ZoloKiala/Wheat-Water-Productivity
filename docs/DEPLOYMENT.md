@@ -1,3 +1,5 @@
+> **Superseded.** This document describes the React `frontend/` + `backend/` application that was replaced by the single-file dashboard and `server/`. Kept for reference; the architecture it describes no longer ships. The previous tree is preserved on branch `snapshot/pre-replace-2026-08-20`.
+
 # Deployment — Railway
 
 Staging first, then production. Both environments run the same image from the

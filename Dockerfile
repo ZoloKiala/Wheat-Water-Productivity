@@ -1,51 +1,39 @@
-# ── Stage 1: build the dashboard bundle ───────────────────────────────────
-FROM node:20-slim AS frontend
-
-WORKDIR /build
-# Copy manifests first so `npm ci` is cached until dependencies actually change.
-COPY frontend/package.json frontend/package-lock.json ./
-# esbuild needs its postinstall to fetch the platform binary Vite invokes.
-RUN npm ci --no-audit --no-fund --foreground-scripts
-
-COPY frontend/ ./
-RUN npm run build
-
-
-# ── Stage 2: Python runtime ───────────────────────────────────────────────
+# WWP dashboard: FastAPI server + the single-file dashboard it serves.
+#
+# rasterio and rioxarray ship manylinux wheels with GDAL bundled, so no apt-get
+# GDAL is needed — which keeps the image small and the build reproducible.
 FROM python:3.11-slim AS runtime
-
-# curl serves the platform health check. The estimation itself is pure numpy,
-# so no native maths runtime is needed. Enabling the WaPOR provider additionally
-# requires rasterio/GDAL — see backend/requirements.txt.
-RUN apt-get update \
- && apt-get install -y --no-install-recommends curl \
- && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
+# curl serves the platform health check.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-COPY backend/requirements.txt ./backend/requirements.txt
-RUN pip install --no-cache-dir -r backend/requirements.txt
+# Requirements first, so dependency layers cache until they actually change.
+COPY server/requirements.txt server/requirements-wapor.txt ./server/
+RUN pip install --no-cache-dir -r server/requirements-wapor.txt
 
-COPY backend/ ./backend/
-COPY --from=frontend /build/dist ./frontend/dist
+COPY server/ ./server/
+COPY Data/ ./Data/
+COPY wheat_dashboard.html 404.html 500.html ./
 
-WORKDIR /app/backend
+# FAO WaPOR v3 is the only source of numbers; there is no synthetic fallback.
+# The cache lives outside the read-only app tree so a volume can hold it.
+ENV WWP_CACHE_DIR=/tmp/wwp-cache
 
-# Fail the build rather than ship an image whose estimates disagree with the
-# reference notebook. Costs a second and catches a bad crop_params.json or an
-# accidental change to the estimation chain before it can reach a deployment.
-COPY tests/test_notebook_parity.py ./parity_check.py
-RUN python parity_check.py && rm parity_check.py
-
-# Run as an unprivileged user.
-RUN useradd --create-home --uid 10001 wwp && chown -R wwp:wwp /app
-USER wwp
+# Fail the build rather than ship an image whose chain disagrees with the
+# reference notebook. Costs a second and catches a bad edit to the estimation
+# chain or the crop parameters before it can reach a deployment.
+RUN python server/selftest.py
 
 EXPOSE 8000
-# Railway (and most PaaS) inject $PORT; shell form so it expands, with a local
-# default for `docker run` without one.
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+  CMD curl -fsS "http://127.0.0.1:${PORT:-8000}/api/health" || exit 1
+
+CMD ["python", "server/run.py"]
