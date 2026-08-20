@@ -1,27 +1,13 @@
-# Python
+# caches and build leftovers
 __pycache__/
-*.py[cod]
+*.pyc
+server/.cache/
 .venv/
-venv/
-
-# Generated model artifacts — retrain with `python backend/train_model.py`
-backend/models/
-
-# Frontend
 node_modules/
-frontend/dist/
 
-# Test output
-tests/screenshots/
-tests/node_modules/
-tests/package*.json
+# Design-canvas working directory: the .dc.html canvas plus ~1.4 MB of pasted
+# screenshots. Design source, not application source.
+wwp/
 
-# Documentation build (the PDFs themselves are committed as deliverables)
-docs/node_modules/
-docs/package*.json
-docs/pdf/*.html
-
-# Office lock files and OS cruft
-~$*
-Thumbs.db
-.DS_Store
+# Contract documents stay out of a public repo.
+*.docx

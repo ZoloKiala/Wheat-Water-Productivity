@@ -1,27 +1,8 @@
 .git
 .gitignore
-.gitattributes
-
-# Rebuilt inside the image
-node_modules
-frontend/node_modules
-frontend/dist
-docs/node_modules
-tests/node_modules
-
-# Retrained inside the image by train_model.py
-backend/models
-
-__pycache__
 **/__pycache__
-*.py[cod]
-.venv
-venv
-
-# Not needed at runtime
-docs
-tests
+**/*.pyc
+server/.cache
+wwp/
 *.docx
-~$*
-WWP Dashboard.html
-README.md
+*.ipynb

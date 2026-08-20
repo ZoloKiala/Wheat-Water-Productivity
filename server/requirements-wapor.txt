@@ -1,0 +1,10 @@
+# Real FAO WaPOR v3 retrieval (WWP_PROVIDER=wapor). GDAL is a heavy binary
+# dependency, which is why it is not in the default install — the dashboard runs
+# without it on the clearly-labelled synthetic provider.
+-r requirements.txt
+xarray>=2024.1
+rioxarray>=0.15
+rasterio>=1.3
+dask>=2024.1        # rioxarray chunks=True; without it the COG read is eager
+numpy>=1.26
+requests>=2.31

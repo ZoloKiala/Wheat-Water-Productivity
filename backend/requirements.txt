@@ -1,6 +1,0 @@
-fastapi>=0.110
-uvicorn[standard]>=0.29
-numpy>=1.26
-lightgbm>=4.3
-pyshp>=2.3
-python-multipart>=0.0.9
