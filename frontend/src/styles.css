@@ -8,7 +8,6 @@
   --red:#c2452d;
   /* Validated chart tokens — see docs/ARCHITECTURE.md § Visualization palette */
   --wwp-1:#93bd82; --wwp-2:#6ba763; --wwp-3:#458b4b; --wwp-4:#297038; --wwp-5:#0f4d26;
-  --pos:#d97a1e; --neg:#1f6f9c;
   --grid:#eceee8;
   /* Chrome heights — .app sizes itself from these. */
   --hdr-h:58px; --ftr-h:34px;
@@ -63,7 +62,10 @@ select,input{font-family:inherit}
 .drop .big{font-size:13px;font-weight:600;color:var(--green-800);margin-top:6px}
 .drop .small{font-size:11.5px;color:var(--muted);margin-top:3px}
 .filechip{display:flex;align-items:center;gap:8px;background:#eef3ea;border:1px solid #cfdcc9;border-radius:7px;padding:8px 10px;font-size:12.5px;font-weight:600;color:var(--green-900);margin-top:10px}
-.filechip .x{margin-left:auto;border:0;background:transparent;color:var(--muted);font-size:14px;line-height:1}
+/* A long filename must truncate rather than push the remove control off the
+   panel: the control has to stay reachable whatever the file is called. */
+.filechip span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.filechip .x{margin-left:auto;flex-shrink:0;border:0;background:transparent;color:var(--muted);font-size:14px;line-height:1}
 .seg{display:flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
 .seg button{flex:1;border:0;background:#fff;padding:8px 6px;font-size:12.5px;font-weight:600;color:var(--muted)}
 .seg button + button{border-left:1px solid var(--line-2)}
@@ -131,6 +133,31 @@ select,input{font-family:inherit}
   font-size:12.5px;font-weight:700;color:var(--green-800);box-shadow:0 3px 12px rgba(20,40,25,.18)}
 .reopen:hover{background:#eef3ea;border-color:var(--green-700)}
 
+/* Demonstration-data notice: the values are indistinguishable from real WaPOR
+   output downstream, so the caveat sits with the numbers, not in a footnote. */
+.banner{margin:14px 18px 0;padding:10px 12px;border-radius:9px;background:var(--wheat);
+  border:1px solid #e3cf9c;color:#6b4e12;font-size:11.5px;line-height:1.5}
+.banner b{font-weight:800}
+.banner code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;
+  background:rgba(255,255,255,.7);border-radius:4px;padding:1px 4px}
+
+/* Estimation chain: input -> intermediates -> result, with the operation that
+   produced each step shown on the connector between them. */
+.chain{list-style:none;border:1px solid var(--line);border-radius:9px;background:#fff;padding:10px 12px}
+.chain .node{display:flex;align-items:baseline;gap:10px}
+.chain .nm{font-size:12px;font-weight:700;color:var(--ink)}
+.chain .val{margin-left:auto;font-size:14px;font-weight:800;color:var(--green-800);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.chain .val em{font-style:normal;font-size:10.5px;font-weight:600;color:var(--muted);margin-left:4px}
+.chain .src{font-size:10.5px;color:var(--muted);margin-top:1px}
+/* The connector is a real rule, not a border trick, so the operation text sits
+   beside the line rather than on top of it. */
+.chain .op{display:flex;align-items:baseline;gap:7px;font-size:10.5px;color:var(--muted);
+  line-height:1.4;margin:7px 0 7px 3px;padding-left:11px;border-left:2px solid var(--line-2)}
+.chain .op .sym{font-size:12px;font-weight:800;color:var(--green-600);min-width:9px}
+.chain li.result .node{border-top:1px solid var(--line);padding-top:8px}
+.chain li.result .val{font-size:18px;color:var(--green-900)}
+
 /* chart hover tooltip */
 .ctip{position:absolute;z-index:20;pointer-events:none;background:var(--green-950);color:#fff;font-size:11px;font-weight:600;padding:6px 9px;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.28);white-space:nowrap;transform:translate(-50%,-100%)}
 .ctip .cv{font-variant-numeric:tabular-nums}
@@ -179,3 +206,53 @@ select,input{font-family:inherit}
   .ftr{height:auto;min-height:34px;flex-wrap:wrap;gap:8px 12px;padding:10px 16px;line-height:1.5}
   .ftr .dot{display:none}
 }
+
+/* ── Per-scheme workflow (reference-notebook input and output) ───────────
+   A scheme file answers a different question from an extent: one row per plot
+   rather than one raster, so the results panel here is table-led and the two
+   figures the notebook draws sit above them. */
+.schemeask{margin-top:10px;padding:10px 11px;border:1px solid var(--line);
+  border-radius:9px;background:#fbfcfa}
+.schemeask .small{font-size:11.5px;color:var(--muted);line-height:1.45;margin-bottom:8px}
+.runbtn.alt{background:#fff;color:var(--green-800);border:1px solid var(--green-600);
+  font-size:12.5px;padding:9px}
+.runbtn.alt:hover{background:var(--green-700);color:#fff}
+.runbtn.alt:disabled{background:#fff;color:#9db3a4;border-color:var(--line-2);cursor:default}
+.hint.warn{color:#8a5a12}
+
+/* Ready-made scheme files. Each entry is a name, a size and a caveat, so the
+   user knows what they are loading before they load it — the campaign files are
+   real field data and the generated one is not. */
+.datasets{margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
+.datasets .lbl{font-size:10.5px;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--muted)}
+.datasets .ds{margin-top:7px;font-size:11.5px;line-height:1.45}
+.datasets .ds .meta{color:var(--muted);margin-left:6px;white-space:nowrap}
+.datasets .ds .note{display:block;color:var(--muted)}
+.datasets .src{margin-top:8px;font-size:10.5px;color:var(--muted);line-height:1.45}
+
+.banner.ok{background:#eef6ef;border-color:#c9e0cd;color:#1f4a30}
+
+/* Result tables carry every uploaded attribute, so they scroll sideways inside
+   the panel rather than forcing the panel itself to scroll. */
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:9px;background:#fff;
+  padding:2px 10px 6px;margin-top:8px}
+.dtable.wide{font-size:10.5px;white-space:nowrap}
+.dtable.wide th,.dtable.wide td{padding:4px 10px 4px 0}
+/* These headers are literal field names the user also sees in QGIS and in the
+   exported CSV, so they are shown verbatim rather than upper-cased. */
+.dtable.wide th{position:sticky;top:0;background:#fff;text-transform:none;letter-spacing:0;
+  font-size:10.5px;color:var(--muted)}
+.dtable th.res{color:var(--green-800)}
+.dtable th .cu{text-transform:none;letter-spacing:0;font-weight:500}
+.eqlist{list-style:none;border:1px solid var(--line);border-radius:9px;background:#fff;
+  padding:9px 12px;margin:4px 0 8px}
+.eqlist li{padding:2px 0}
+.eqlist code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--ink)}
+/* Inline action inside a hint line: reads as a link, behaves as a button. */
+.linkbtn{border:0;background:none;padding:0;color:var(--green-700);font-size:inherit;
+  font-weight:700;text-decoration:underline}
+.linkbtn:hover{color:var(--green-900)}
+.linkbtn:disabled{color:var(--muted);text-decoration:none;cursor:default}
+.hint code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;
+  background:#f0f2ed;border-radius:3px;padding:0 3px}

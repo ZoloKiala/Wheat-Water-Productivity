@@ -1,6 +1,10 @@
 fastapi>=0.110
 uvicorn[standard]>=0.29
 numpy>=1.26
-lightgbm>=4.3
 pyshp>=2.3
 python-multipart>=0.0.9
+
+# Optional: enable real FAO WaPOR v3 retrieval (WWP_PROVIDER=wapor). Left out of
+# the default install because GDAL is a heavy binary dependency and the
+# dashboard runs without it on the synthetic provider.
+# rasterio>=1.3

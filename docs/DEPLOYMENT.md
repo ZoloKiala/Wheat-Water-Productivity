@@ -9,14 +9,15 @@ same `Dockerfile`; only environment variables differ.
 
 1. **`node:20-slim`** installs the frontend dependencies and runs `vite build`.
 2. **`python:3.11-slim`** installs the backend requirements, copies the built
-   bundle to `frontend/dist`, and **trains the model during the build** so the
-   image ships ready to serve.
+   bundle to `frontend/dist`, and runs the notebook parity check.
 
-Training at build time rather than at startup is deliberate: a cold container
-would otherwise spend ~40 s training before its first response, which is long
-enough to fail the platform health check and put the service into a restart
-loop. The container also installs `libgomp1` — LightGBM's OpenMP runtime, which
-the slim Python image omits and without which `import lightgbm` fails.
+The parity check (`tests/test_notebook_parity.py`) replays every result the IWMI
+reference notebook publishes through the shipped code and fails the build if any
+disagrees. It costs about a second and it is the reason an image whose estimates
+have drifted from the reference cannot reach a deployment.
+
+There is nothing to train and no model artifact, so container boot is fast: the
+service loads no state beyond its own code.
 
 The service runs as an unprivileged user and binds `$PORT`, which Railway
 injects.
@@ -26,9 +27,45 @@ injects.
 | Variable | Required | Purpose |
 |---|---|---|
 | `PORT` | injected by Railway | Listen port |
-| `WWP_ADMIN_TOKEN` | for model management | Enables `POST /api/model/retrain`. **Without it that route returns 503** — the service fails closed rather than exposing model replacement. |
-| `WWP_MODELS_DIR` | if retraining in place | Absolute path to a mounted volume for model artifacts. Without it artifacts live on the container filesystem and any retrained model is **lost on the next restart or redeploy**. |
+| `WWP_PROVIDER` | **yes, for real data** | `synthetic` (default) or `wapor`. Left unset, the service serves demonstration figures — clearly labelled, but not real. |
+| `WWP_CROP_PARAMS` | when EIAR parameters land | Absolute path to a JSON file overriding AOT, fc, mc and hi. Mount it as a volume or bake it in as `backend/crop_params.json`. |
+| `WWP_WAPOR_LEVEL` | no | WaPOR product level. `L2` by default: the national 100 m products, which is what the reference implementation reads. `L1` is the 300 m global product; `L3` is the 20 m scheme mosaics and needs `WWP_WAPOR_SCHEME`. |
+| `WWP_WAPOR_SCHEME` | for L3 only | Irrigation scheme code for the L3 mosaics: `KOG` (Koga) or `AWH` (Awash). Unset for L1 and L2. |
+| `WWP_WAPOR_STORAGE` | no | Cloud storage root holding the dekadal GeoTIFFs, for a mirror. |
+| `WWP_WAPOR_BASE` | no | Catalogue base URL, for a mirror or a pinned API version. |
+| `WWP_CAMPAIGN_DATA` | no | Directory holding the 2026 campaign shapefiles, if they are on the host. Where they are found the Upload panel offers them as ready-made files; where they are not — the container image, and any public deployment — it offers a generated sample instead. The image deliberately does not carry them. |
 | `WWP_CORS_ORIGINS` | only for cross-origin embedding | Comma-separated allowlist. The dashboard is served from the same origin, so this is unnecessary unless the EIAR site calls the API from another host. |
+
+## Enabling real WaPOR retrieval
+
+The default image serves synthetic data. Switching to live FAO WaPOR v3 needs two
+things:
+
+1. **`rasterio`** in the image. It is commented out in
+   `backend/requirements.txt` because GDAL is a large binary dependency that
+   every deployment would otherwise pay for. Uncomment it and rebuild; the
+   `python:3.11-slim` base carries manylinux wheels for it, so no extra apt
+   packages are needed.
+2. **`WWP_PROVIDER=wapor`**.
+
+Then verify before trusting anything:
+
+```bash
+curl https://<domain>/api/wapor/check
+```
+
+That endpoint checks the catalogue is reachable, the NPP and AETI mapsets exist,
+their units are what the seasonal accumulation assumes, a scale factor is
+published, a concrete dekadal raster resolves to a download URL, and `rasterio`
+is importable. Every check must pass. The catalogue half of this contract has
+been verified against the live FAO service; the pixel read has not, so treat the
+first real analysis as something to sanity-check against known field values
+rather than as proven output.
+
+Expect analyses to be considerably slower than on the synthetic provider: a
+five-month season is roughly 15 dekads, and the five-season trend multiplies that
+again. The 30-minute response cache absorbs repeats, but the first run over a new
+extent will take a while.
 
 ## First deploy — staging
 
@@ -49,22 +86,6 @@ railway up --service wwp-dashboard --environment staging
 railway domain                     # mint a public URL
 ```
 
-Model management stays disabled until you set a token. Generate and set one only
-when EIAR needs retraining enabled — this prints nothing to the terminal:
-
-```powershell
-$tok = -join ((1..32) | ForEach-Object { '{0:x}' -f (Get-Random -Max 16) })
-railway variables --set "WWP_ADMIN_TOKEN=$tok" --service wwp-dashboard
-$env:WWP_ADMIN_TOKEN = $tok        # so the test suites can use it
-```
-
-### bash / zsh equivalents
-
-```bash
-railway variables --set "WWP_ADMIN_TOKEN=$(openssl rand -hex 24)" --service wwp-dashboard
-export WWP_ADMIN_TOKEN=...         # PowerShell uses $env:NAME = "..." instead
-```
-
 Setting an environment variable is the one place the two shells differ enough to
 trip you up:
 
@@ -72,13 +93,15 @@ trip you up:
 |---|---|---|
 | Set a variable | `$env:WWP_BASE = "https://host"` | `export WWP_BASE=https://host` |
 | Read it back | `$env:WWP_BASE` | `$WWP_BASE` |
+| Run two commands | `cd tests; node test_ui.mjs` | `cd tests && node test_ui.mjs` |
 
-PowerShell has no `export`, and **no spaces around the `=`**.
+PowerShell has no `export`, and **no spaces around the `=`**. Windows PowerShell
+5.1 also has no `&&`: the bash snippets below chain with it, so substitute `;`
+there — `&&` is a parse error, not a warning.
 
 Railway reads `railway.json`, which pins the Dockerfile builder, sets the health
-check to `/api/health` with a 300 s timeout (the image build trains the model, so
-boot itself is fast, but the generous timeout covers a slow cold start), and
-**fixes the service at one replica**.
+check to `/api/health` with a 300 s timeout, and **fixes the service at one
+replica**.
 
 One replica is a correctness requirement, not a cost choice. The upload registry
 and the completed-run store are in-process dictionaries, so with two replicas a
@@ -92,54 +115,40 @@ Point the test suites at the deployed URL — they need no local server:
 
 ```bash
 export WWP_BASE=https://<your-staging-domain>
-python tests/test_api_e2e.py       # 46 checks, or 49 with WWP_ADMIN_TOKEN set
+python tests/test_api_e2e.py       # 54 checks
 
 cd tests && npm install playwright && npx playwright install chromium
-node test_ui.mjs                   # 51 browser checks against the live site
+node test_ui.mjs                   # 54 browser checks against the live site
 ```
 
-The API suite covers all three AOI journeys, caching, idempotency and every
-validation path, so a green run against staging is a real smoke test rather than
-a liveness ping.
+The API suite covers all three AOI journeys, caching, idempotency, every
+validation path, and the WaPOR catalogue contract, so a green run against staging
+is a real smoke test rather than a liveness ping. It also asserts that the crop
+constant still matches the reference notebook, which catches a bad
+`WWP_CROP_PARAMS` in a deployed environment rather than in code review.
+
+`GET /api/health` reports the active provider, and `GET /api/method` reports the
+equations and parameters actually in force. Check both after any environment
+change.
 
 ## Promote to production
 
 ```bash
 railway environment production
-railway variables --set "WWP_ADMIN_TOKEN=<a different secret>"
+railway variables --set "WWP_PROVIDER=wapor"
 railway up
 railway domain
 ```
 
-Use a **different** admin token per environment so a staging leak cannot touch
-the production model.
-
-## Retraining in a deployment
-
-Model artifacts live on the container filesystem by default, which Railway
-replaces on every deploy. To retrain against real field data and keep the
-result:
-
-1. Attach a Railway volume, mounted at (say) `/data/models`.
-2. Set `WWP_MODELS_DIR=/data/models`.
-3. Restart. The service finds the volume empty and trains a fresh `v0001` into
-   it, after which every promoted version persists across deploys.
-
-Then retrain with:
-
-```bash
-curl -X POST https://<domain>/api/model/retrain \
-  -H "X-Admin-Token: $WWP_ADMIN_TOKEN" \
-  -F file=@field_observations.csv
-```
-
-The response reports the candidate's holdout metrics beside the active model's
-on the same split, and whether it was promoted. A candidate that would degrade
-RMSE is rejected and the running model keeps serving.
+Then re-run `/api/wapor/check` and `/api/method` against the production domain
+before announcing it: the provider and the crop parameters are per-environment
+settings, and getting either wrong produces plausible-looking numbers rather than
+an error.
 
 ## Before this is a public EIAR service
 
 Beyond the environment setup above, the gaps listed in the ToR Coverage document
-still apply — chiefly the live WaPOR provider (every value served today is
-synthetic), PostGIS for the upload and run stores, and Redis for the cache if the
+still apply — chiefly enabling the WaPOR provider (every value served on the
+default configuration is synthetic), validating the crop parameters against EIAR
+field data, PostGIS for the upload and run stores, and Redis for the cache if the
 replica count ever rises above one.

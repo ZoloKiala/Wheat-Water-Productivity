@@ -9,18 +9,22 @@ frontend/dist
 docs/node_modules
 tests/node_modules
 
-# Retrained inside the image by train_model.py
-backend/models
-
 __pycache__
 **/__pycache__
 *.py[cod]
 .venv
 venv
 
+# Campaign field data never belongs in an image. The build copies only backend/
+# and the built bundle, so this is belt and braces — a public deployment must
+# offer the generated sample, not IWMI's field observations.
+Data
+
 # Not needed at runtime
 docs
 tests
+# ...except the parity check, which gates the build (see Dockerfile).
+!tests/test_notebook_parity.py
 *.docx
 ~$*
 WWP Dashboard.html

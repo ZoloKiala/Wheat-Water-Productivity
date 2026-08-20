@@ -14,15 +14,16 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .api import router
-from .model_service import MODEL
+from .geodata import PROVIDER
 
 app = FastAPI(
     title="Wheat Water Productivity (WWP) API",
     description=(
         "Backend service for the EIAR Wheat Water Productivity Dashboard: "
-        "WWPT analytical engine, WaPOR data access and LightGBM prediction "
-        "service with per-prediction explanations. Developed by IWMI East "
-        "Africa with EIAR under WaPOR Phase II."
+        "the WWPT analytical engine — FAO WaPOR v3 seasonal NPP and AETI "
+        "converted to wheat biomass, yield and water productivity, ported from "
+        "the IWMI reference notebook. Developed by IWMI East Africa with EIAR "
+        "under WaPOR Phase II."
     ),
     version="1.0.0",
 )
@@ -57,8 +58,19 @@ async def _api_not_found(_path: str):
 
 
 @app.on_event("startup")
-def _load_model():
-    MODEL.load_or_train()
+def _announce_provider():
+    """Make the data source obvious in the service log at boot.
+
+    Running on synthetic data is a legitimate mode, but it must never be a
+    silent one — the values are indistinguishable from real output downstream.
+    """
+    if getattr(PROVIDER, "synthetic", False):
+        print(
+            f"[wwp] data provider: {PROVIDER.name} — DEMONSTRATION DATA, not FAO "
+            "WaPOR v3. Set WWP_PROVIDER=wapor for real retrieval."
+        )
+    else:
+        print(f"[wwp] data provider: {PROVIDER.name}")
 
 
 DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"

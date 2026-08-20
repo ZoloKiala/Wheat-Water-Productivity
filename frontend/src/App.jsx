@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
 import MapView from './MapView'
 import { PAGES } from './content'
-import { FeatureChart, HistChart, RAMP_HEX, ShapChart, TrendChart, rampIndex } from './charts'
+import { ChainChart, HistChart, TrendChart } from './charts'
+import SchemeResults from './schemes'
 
 const STEPS = [
-  ['Retrieving WaPOR NPP…', 'Season composite · 100 m'],
-  ['Computing water productivity…', 'NPP → biomass → grain yield'],
-  ['Running LightGBM inference…', 'Biophysical + socioeconomic features'],
+  ['Retrieving WaPOR NPP and AETI…', 'Dekadal rasters, summed over the season'],
+  ['Converting NPP to biomass…', 'AOT · fc · 22.222 ÷ (1 − mc)'],
+  ['Computing yield and water productivity…', 'Grain yield ÷ water consumed'],
 ]
 
 function polygonAreaHa(poly) {
@@ -22,7 +23,7 @@ function polygonAreaHa(poly) {
 export default function App() {
   /* ── reference data ─────────────────────────────────────────────────── */
   const [units, setUnits] = useState(null)
-  const [modelInfo, setModelInfo] = useState(null)
+  const [method, setMethod] = useState(null)
   const [bootError, setBootError] = useState(null)
 
   /* ── AOI ────────────────────────────────────────────────────────────── */
@@ -31,6 +32,9 @@ export default function App() {
   const [zone, setZone] = useState('')
   const [woreda, setWoreda] = useState('')
   const [upload, setUpload] = useState(null)
+  const [datasets, setDatasets] = useState(null)
+  const [schemeResult, setSchemeResult] = useState(null)
+  const [schemeBusy, setSchemeBusy] = useState(false)
   const [uploadBusy, setUploadBusy] = useState(false)
   const [uploadError, setUploadError] = useState(null)
   const [dropHot, setDropHot] = useState(false)
@@ -82,7 +86,11 @@ export default function App() {
       setRegion(r); setZone(z); setWoreda(u.tree[r][z][0])
       setYear(u.years.includes('2024/25') ? '2024/25' : u.years[0])
     }).catch((e) => setBootError(e.message))
-    api.getModelInfo().then(setModelInfo).catch(() => { /* non-blocking */ })
+    api.getMethod().then(setMethod).catch(() => { /* non-blocking */ })
+    /* Which scheme files this deployment can offer. Non-blocking: without it
+       the upload panel simply has nothing to load, and uploads still work. */
+    api.getSchemeDatasets().then((d) => setDatasets(d.datasets || []))
+      .catch(() => setDatasets([]))
   }, [])
 
   /* keep zone/woreda valid when the parent changes */
@@ -132,6 +140,9 @@ export default function App() {
     if (aoiTab === 'admin') {
       return result && result.label === currentAoi?.label ? { bounds: result.bounds } : null
     }
+    if (currentAoi?.geometry_type === 'point' && currentAoi.geojson?.coordinates?.length) {
+      return { points: currentAoi.geojson.coordinates.map(([lon, lat]) => [lat, lon]) }
+    }
     if (currentAoi?.polys) return { polys: currentAoi.polys }
     if (currentAoi?.bounds) return { bounds: currentAoi.bounds }
     return null
@@ -154,10 +165,15 @@ export default function App() {
     try {
       const rec = await api.uploadBoundary(file)
       setUpload(rec)
+      setSchemeResult(null)
       fit(rec.bounds)
-      notify(`Boundary validated: ${rec.n_polygons} polygon${rec.n_polygons > 1 ? 's' : ''}, ${rec.crs}`)
+      const what = rec.geometry_type === 'point'
+        ? `${rec.n_features} sample point${rec.n_features > 1 ? 's' : ''}`
+        : `${rec.n_polygons} polygon${rec.n_polygons > 1 ? 's' : ''}`
+      notify(`File validated: ${what}, ${rec.crs}`)
     } catch (e) {
       setUpload(null)
+      setSchemeResult(null)
       setUploadError(e.message)
     } finally {
       setUploadBusy(false)
@@ -178,13 +194,50 @@ export default function App() {
     setDrawPoints([])
   }
 
+  /* Loads a ready-made scheme file through the ordinary upload path, so what
+     the user tries is the real journey, validation included, not a canned
+     result. The 2026 campaign shapefiles come through here too, which is why
+     they need no special case anywhere downstream. */
+  async function loadDataset(name) {
+    setUploadError(null)
+    try {
+      const s = await api.getSchemeDataset(name)
+      const file = new File([JSON.stringify(s.geojson)], s.filename,
+        { type: 'application/geo+json' })
+      await handleUpload(file)
+    } catch (e) {
+      setUploadError(e.message)
+    }
+  }
+
+  /* The notebook's workflow: estimate every feature in the uploaded file over
+     its own SOS/EOS window, rather than gridding one merged extent. */
+  async function runSchemes() {
+    if (!upload) return
+    setSchemeBusy(true); setRunError(null)
+    const key = `s-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    try {
+      const res = await api.runSchemeAnalysis(upload.upload_id, key)
+      setSchemeResult(res)
+      setResult(null)
+      setResultsOpen(true)
+      if (res.bounds) fit(res.bounds)
+      notify(`${res.n_features} feature${res.n_features > 1 ? 's' : ''} estimated.`)
+    } catch (e) {
+      setRunError(e.message)
+      notify(e.message, true)
+    } finally {
+      setSchemeBusy(false)
+    }
+  }
+
   async function run() {
     if (!currentAoi) {
       notify(aoiTab === 'upload' ? 'Upload a boundary file first.' : 'Draw a polygon first.', true)
       return
     }
     setBusy(true); setStep(0); setRunError(null)
-    setExplain(null); setMarker(null); setPopup(null)
+    setExplain(null); setMarker(null); setPopup(null); setSchemeResult(null)
     const ticker = setInterval(() => setStep((s) => Math.min(s + 1, STEPS.length - 1)), 700)
     const key = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     try {
@@ -214,12 +267,12 @@ export default function App() {
         html: `<div class="pop"><h5>Wheat water productivity</h5>
           <span class="pv">${p.wwp.toFixed(2)}</span> <span class="pu">kg/m³</span>
           <table>
-            <tr><td>Predicted yield</td><td>${p.yield_t_ha.toFixed(1)} t/ha</td></tr>
-            <tr><td>Seasonal NPP</td><td>${p.npp.toLocaleString()} kgC/ha</td></tr>
-            <tr><td>Seasonal ET</td><td>${p.aet_mm} mm</td></tr>
+            <tr><td>Estimated yield</td><td>${p.yield_t_ha.toFixed(2)} t/ha</td></tr>
+            <tr><td>Seasonal NPP</td><td>${p.npp.toLocaleString()} gC/m²</td></tr>
+            <tr><td>Seasonal AETI</td><td>${p.aeti_mm} mm</td></tr>
             <tr><td>Location</td><td>${lat.toFixed(4)}, ${lng.toFixed(4)}</td></tr>
           </table>
-          <button class="explink" id="explainLink" type="button">Explain this prediction →</button>
+          <button class="explink" id="explainLink" type="button">Show the derivation →</button>
           </div>`,
       })
     } catch (err) {
@@ -354,10 +407,34 @@ export default function App() {
                   <div className="filechip">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a5735"
                       strokeWidth="2" aria-hidden="true"><path d="M20 6L9 17l-5-5" /></svg>
-                    <span>{upload.label.replace('Uploaded boundary — ', '')} · {upload.area_ha.toLocaleString()} ha</span>
+                    <span>{upload.label.replace('Uploaded boundary — ', '')} · {upload.geometry_type === 'point'
+                      ? `${upload.n_features} point${upload.n_features > 1 ? 's' : ''}`
+                      : `${upload.area_ha.toLocaleString()} ha`}</span>
                     <button className="x" onClick={() => { setUpload(null); setUploadError(null) }}
                       aria-label="Remove uploaded boundary">✕</button>
                   </div>
+                )}
+                {upload && upload.scheme_ready && (
+                  /* The file carries ID/SOS/EOS per feature, so it can drive the
+                     reference notebook's own workflow: every plot estimated over
+                     its own season, rather than one merged extent. */
+                  <div className="schemeask">
+                    <div className="small">
+                      {upload.n_features} feature{upload.n_features > 1 ? 's' : ''} with
+                      per-feature growing seasons{upload.geometry_type === 'point'
+                        ? ' (sample points)' : ''}.
+                    </div>
+                    <button className="runbtn alt" onClick={runSchemes} disabled={schemeBusy}>
+                      {schemeBusy ? 'Estimating…' : 'Estimate each plot'}
+                    </button>
+                  </div>
+                )}
+                {upload && !upload.scheme_ready && upload.validation && (
+                  <p className="hint warn">
+                    Per-plot estimation needs ID, SOS and EOS on every feature
+                    {upload.geometry_type === 'point' ? ', plus Location' : ''}.
+                    {' '}{upload.validation.problems[0]}
+                  </p>
                 )}
                 {uploadError && (
                   <p className="err" role="alert">
@@ -368,8 +445,33 @@ export default function App() {
                     {uploadError}
                   </p>
                 )}
-                <p className="hint">Attribute fields are read automatically. Geometry and coordinate
-                  reference system are validated on upload.</p>
+                <p className="hint">A file whose features carry <code>ID</code>, <code>SOS</code> and
+                  <code> EOS</code> (plus <code>Location</code> for sample points) can be estimated
+                  plot by plot, each over its own growing season, the way the WWPT notebook does it.</p>
+                {datasets && datasets.length > 0 && (
+                  /* Ready-made files, campaign data first where this machine has
+                     it. Listed from the service rather than hard-coded: a public
+                     deployment has only the generated sample, and the panel then
+                     offers only that rather than a link that cannot work. */
+                  <div className="datasets">
+                    <div className="lbl">Or load a ready-made file</div>
+                    {datasets.map((ds) => (
+                      <div className="ds" key={ds.name}>
+                        <button className="linkbtn" type="button" data-dataset={ds.name}
+                          disabled={uploadBusy} onClick={() => loadDataset(ds.name)}>
+                          {ds.label}
+                        </button>
+                        <span className="meta">{ds.n_features}{' '}
+                          {ds.geometry_type === 'point' ? 'sample points' : 'plot boundaries'}</span>
+                        <span className="note">{ds.note}</span>
+                      </div>
+                    ))}
+                    {datasets.some((ds) => ds.kind === 'campaign') && (
+                      <div className="src">Campaign files are IWMI field data, read
+                        from this machine — they are not part of the service.</div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -433,8 +535,9 @@ export default function App() {
                 </select>
               </div>
             </div>
-            <p className="hint">NPP is retrieved from FAO WaPOR v3 for the selected season
-              (100 m, dekadal).</p>
+            <p className="hint">NPP and AETI are retrieved from FAO WaPOR v3 for the
+              selected season and summed across its dekads
+              {method?.resolution_m ? ` (${method.resolution_m} m)` : ''}.</p>
           </div>
 
           <div className="sec">
@@ -445,8 +548,8 @@ export default function App() {
               {busy ? 'Running…' : 'Run analysis'}
             </button>
             <p className="hint" style={{ textAlign: 'center' }}>
-              Computes WWP at 100 m and predicts productivity with the LightGBM model
-              {modelInfo?.version ? ` (${modelInfo.version})` : ''}.
+              Retrieves seasonal WaPOR NPP and AETI, then estimates wheat biomass,
+              yield and water productivity.
             </p>
             {runError && <p className="err" role="alert">{runError}</p>}
           </div>
@@ -476,7 +579,7 @@ export default function App() {
                 : 'Double-click to finish · Esc to cancel'}
             </div>
           )}
-          {result && !resultsOpen && (
+          {(result || schemeResult) && !resultsOpen && (
             /* Closing the panel must not strand a completed run. */
             <button className="reopen" onClick={() => setResultsOpen(true)}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -492,7 +595,7 @@ export default function App() {
               <div className="ramp" />
               <div className="ramplbl"><span>0.4</span><span>0.8</span><span>1.2</span><span>1.6+</span></div>
               <div className="ramplbl" style={{ justifyContent: 'center', marginTop: 2 }}>
-                <span>kg grain per m³ of water · 100 m</span>
+                <span>kg grain per m³ of water{result.resolution_m ? ` · ${result.resolution_m} m` : ''}</span>
               </div>
             </div>
           )}
@@ -510,6 +613,10 @@ export default function App() {
         {/* ───────── Results ─────────
              Mounted only once an analysis has produced results, so the panel
              never occupies the layout while it has nothing to show. */}
+        {schemeResult && resultsOpen && (
+          <SchemeResults data={schemeResult} onClose={() => setResultsOpen(false)} />
+        )}
+
         {result && resultsOpen && (
           <aside className="results" aria-label="Analysis results">
               <div className="rhead">
@@ -518,10 +625,26 @@ export default function App() {
                   <div className="sub">
                     {result.label} · {result.season} {result.year} · {result.system}
                   </div>
+                  <div className="sub">
+                    Season {result.season_window.sos} to {result.season_window.eos} ·
+                    LGP {result.season_window.lgp_days} days
+                  </div>
                 </div>
                 <button className="close" onClick={() => setResultsOpen(false)}
                   title="Close results" aria-label="Close results">✕</button>
               </div>
+
+              {result.synthetic && (
+                /* The values below are indistinguishable from real output once
+                   they leave the screen, so the data source has to be stated
+                   where the numbers are, not only in the documentation. */
+                <p className="banner" role="note">
+                  <b>Demonstration data.</b> These values come from the built-in
+                  synthetic provider ({result.provider}), not FAO WaPOR v3. The method
+                  is the real one; the inputs are not. Set <code>WWP_PROVIDER=wapor</code>
+                  on the service for actual retrieval.
+                </p>
+              )}
 
               <div className="kpis">
                 <div className="kpi hero">
@@ -532,13 +655,18 @@ export default function App() {
                   </div>
                 </div>
                 <div className="kpi">
-                  <div className="l">Predicted yield</div>
-                  <div className="v">{result.yield_t_ha.toFixed(1)}</div>
-                  <div className="u">t/ha (LightGBM)</div>
+                  <div className="l">Estimated yield</div>
+                  <div className="v">{result.yield_t_ha.toFixed(2)}</div>
+                  <div className="u">t/ha</div>
                 </div>
                 <div className="kpi">
-                  <div className="l">Seasonal ET</div>
+                  <div className="l">Seasonal AETI</div>
                   <div className="v">{result.et_mm}</div><div className="u">mm</div>
+                </div>
+                <div className="kpi">
+                  <div className="l">Seasonal NPP</div>
+                  <div className="v">{result.npp_mean.toLocaleString()}</div>
+                  <div className="u">gC/m²</div>
                 </div>
                 <div className="kpi">
                   <div className="l">Wheat area analysed</div>
@@ -564,29 +692,30 @@ export default function App() {
               </div>
 
               <div className="chartsec">
-                <h3>What drives productivity here <span className="badge">LightGBM</span></h3>
+                <h3>How this estimate is built</h3>
                 <div className="note">
-                  How often the model consults each feature ({result.model_version})
+                  Area mean through each step of the method. Water productivity is the mean
+                  of the per-pixel ratios, which differs slightly from dividing the means.
                 </div>
-                <FeatureChart data={result.feature_importance} />
+                <ChainChart steps={result.chain} />
               </div>
 
               {explain && (
-                <div className="chartsec" ref={explainRef}>
-                  <h3>Prediction explanation <span className="badge">Selected pixel</span></h3>
+                <div className="chartsec" id="derivation" ref={explainRef}>
+                  <h3>Derivation <span className="badge">Selected pixel</span></h3>
                   <div className="note">
-                    Pixel at {explain.lat.toFixed(4)}°N, {explain.lon.toFixed(4)}°E — each feature's
-                    contribution to this prediction
+                    Pixel at {explain.lat.toFixed(4)}°N, {explain.lon.toFixed(4)}°E — every
+                    input, parameter and intermediate behind its {explain.wwp.toFixed(2)} kg/m³
                   </div>
-                  <ShapChart data={explain} />
+                  <ChainChart steps={explain.chain} />
                 </div>
               )}
 
               {!explain && (
                 <div className="chartsec">
                   <p className="hint" style={{ marginTop: 0 }}>
-                    Click any pixel on the map, then choose <b>Explain this prediction</b> to see
-                    which factors drove that value.
+                    Click any pixel on the map, then choose <b>Show the derivation</b> to see
+                    the inputs and parameters behind that value.
                   </p>
                 </div>
               )}
@@ -604,7 +733,7 @@ export default function App() {
         <span>Data: FAO WaPOR v3</span><span className="dot" />
         <button onClick={() => setPage('cite')}>How to cite</button><span className="dot" />
         <button onClick={() => setPage('disclaimer')}>Disclaimer</button>
-        {modelInfo && <><span className="dot" /><span>Model {modelInfo.version}</span></>}
+        {method && <><span className="dot" /><span>{method.synthetic ? 'Demonstration data' : method.provider}</span></>}
       </footer>
 
       {page && (

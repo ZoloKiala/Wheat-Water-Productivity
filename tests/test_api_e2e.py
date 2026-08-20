@@ -1,12 +1,11 @@
 """End-to-end check against the running uvicorn server."""
 import io
 import json
+import os
 import time
 import urllib.error
 import urllib.request
 import zipfile
-
-import os
 
 BASE = os.environ.get("WWP_BASE", "http://127.0.0.1:8000")
 ok = fail = 0
@@ -60,7 +59,7 @@ def multipart(path, filename, content, field="file", headers=None):
         return e.code, json.loads(e.read())
 
 
-# ── wait for boot (first run trains the model) ────────────────────────────
+# ── wait for boot ───────────────────────────────────────────────
 print("Waiting for server…")
 for _ in range(120):
     try:
@@ -73,19 +72,25 @@ for _ in range(120):
 
 print("\n1. Health & reference data")
 s, h = req("/api/health")
-check("health 200", s == 200 and h["status"] == "ok", f"model {h.get('model_version')}")
+check("health 200", s == 200 and h["status"] == "ok", f"provider {h.get('provider')}")
 s, u = req("/api/admin-units")
 check("admin-units tree", s == 200 and "Oromia" in u["tree"] and u["tree"]["Oromia"]["Arsi"])
 check("seasons per system",
       u["seasons"]["rainfed"] == ["Meher", "Belg"] and len(u["seasons"]["irrigated"]) == 1)
 
-print("\n2. Model info")
-s, mi = req("/api/model/info")
-check("model info 200", s == 200 and mi["metrics"]["r2"] > 0.8, f"R2={mi['metrics']['r2']}")
-check("10 features listed", len(mi["features"]) == 10)
-check("importance graded", mi["importance"][0]["importance"] == 100.0
-      and mi["importance"][-1]["importance"] < 100.0,
-      f"top={mi['importance'][0]['label']}")
+print("\n2. Method description")
+s, mi = req("/api/method")
+check("method 200", s == 200 and "WaPOR" in mi["method"], mi["method"])
+check("equations published", len(mi["equations"]) == 3, mi["equations"][0])
+cp = mi["crop_parameters"]
+check("crop parameters complete",
+      all(k in cp for k in ("aot", "fc", "mc", "hi", "constant")), str(cp))
+# The only combination the outputs depend on. The reference notebook's published
+# results imply 0.4322; drifting off it means the tool no longer agrees with it.
+check("crop constant matches the notebook", abs(cp["constant"] - 0.4322) < 0.002,
+      f"constant={cp['constant']}")
+check("data source declared", "synthetic" in mi and bool(mi["provider"]),
+      f"{mi['provider']} (synthetic={mi['synthetic']})")
 
 print("\n3. Admin-unit analysis")
 body = {"aoi_type": "admin", "region": "Oromia", "zone": "Arsi", "woreda": "Hetosa",
@@ -101,7 +106,16 @@ check("raster png data-uri", r["raster_png"].startswith("data:image/png;base64,i
 check("histogram sums ~100", abs(sum(h["pct"] for h in r["histogram"]) - 100) < 1.5,
       f"{sum(h['pct'] for h in r['histogram']):.1f}%")
 check("trend has 5 seasons", len(r["trend"]) == 5)
-check("importance present", len(r["feature_importance"]) == 10)
+check("estimation chain present", len(r["chain"]) == 5,
+      " -> ".join(c["step"] for c in r["chain"]))
+check("chain ends on water productivity",
+      r["chain"][-1]["role"] == "result" and r["chain"][-1]["unit"] == "kg/m³")
+check("season window resolved",
+      r["season_window"]["sos"] < r["season_window"]["eos"]
+      and r["season_window"]["lgp_days"] > 0,
+      f"{r['season_window']['sos']} to {r['season_window']['eos']} "
+      f"({r['season_window']['lgp_days']} d)")
+check("data source flagged on the result", "synthetic" in r, str(r.get("provider")))
 check("area > 0", r["area_ha"] > 0, f"{r['area_ha']:,} ha")
 run_id = r["run_id"]
 
@@ -118,23 +132,29 @@ print("\n5. Point prediction & explanation")
 s, p = req("/api/predict?lat=8.13&lon=39.24&system=rainfed&year=2024/25&season=Meher")
 check("predict 200", s == 200 and 0.2 < p["wwp"] < 2.2, f"wwp={p['wwp']}")
 s, e = req("/api/explain?lat=8.13&lon=39.24&system=rainfed&year=2024/25&season=Meher")
-check("explain 200", s == 200 and len(e["contributions"]) == 7)
-tot = e["base"] + sum(c["contribution"] for c in e["contributions"])
-check("contributions reconstruct prediction (top-7 partial)",
-      abs(tot - e["prediction"]) < 0.35, f"base+top7={tot:.3f} vs pred={e['prediction']}")
-check("explain matches predict", abs(e["prediction"] - p["wwp"]) < 1e-6)
-check("contributions sorted by magnitude",
-      all(abs(e["contributions"][i]["contribution"]) >= abs(e["contributions"][i+1]["contribution"])
-          for i in range(len(e["contributions"]) - 1)))
-check("features carry value+unit",
-      all(("value" in c and "unit" in c) for c in e["contributions"]))
+check("explain 200", s == 200 and len(e["chain"]) == 5)
+check("explain matches predict", abs(e["wwp"] - p["wwp"]) < 1e-6)
+check("chain steps carry value+unit",
+      all(("value" in c and "unit" in c and "detail" in c) for c in e["chain"]))
+# The point of a deterministic method: the chain shown to the user must actually
+# reproduce the answer, by hand, from the numbers on screen.
+step = {c["step"]: c["value"] for c in e["chain"]}
+check("chain arithmetic reconstructs the value",
+      abs(step["Grain yield"] / step["Water consumed"] - e["wwp"]) < 0.01,
+      f"{step['Grain yield']}/{step['Water consumed']} vs {e['wwp']}")
+check("biomass to yield uses the harvest index",
+      abs(step["Total biomass"] * e["method"]["crop_parameters"]["hi"]
+          - step["Grain yield"]) < 1.0,
+      f"TB={step['Total biomass']} -> Y={step['Grain yield']}")
 
 print("\n6. CSV export")
 s, csv = req(f"/api/export/csv?run_id={run_id}", raw=True)
 lines = csv.decode().strip().splitlines()
 check("csv 200 with rows", s == 200 and len(lines) > 100, f"{len(lines)-1} data rows")
-check("csv header", lines[0] == "lat,lon,wwp_kg_m3,pred_yield_t_ha,npp_kgc_ha,aet_mm")
-check("csv row parses", len(lines[1].split(",")) == 6, lines[1])
+# Column names match the reference notebook so exports are directly comparable.
+check("csv header",
+      lines[0] == "lat,lon,SOS,EOS,LGP,NPP,AETI_mm,EYield_tpha,WP_kgpm3", lines[0])
+check("csv row parses", len(lines[1].split(",")) == 9, lines[1])
 s, bad = req("/api/export/csv?run_id=doesnotexist")
 check("csv unknown run 404", s == 404)
 
@@ -207,34 +227,44 @@ check("corrupt zip 422", s == 422, str(m.get("detail"))[:60])
 s, m = multipart("/api/upload", "far.geojson", json.dumps({"type": "Polygon",
         "coordinates": [[[2.0, 48.0], [2.1, 48.0], [2.1, 48.1], [2.0, 48.1], [2.0, 48.0]]]}).encode())
 check("outside Ethiopia 422", s == 422, str(m.get("detail"))[:60])
+# The 3-degree cap is a property of the raster journey, not of the file: a
+# national scheme file uploads fine and is estimated per feature, so the cap is
+# enforced when the extent is actually gridded.
 s, m = multipart("/api/upload", "huge.geojson", json.dumps({"type": "Polygon",
         "coordinates": [[[35.0, 4.0], [45.0, 4.0], [45.0, 14.0], [35.0, 14.0], [35.0, 4.0]]]}).encode())
-check("extent too large 422", s == 422, str(m.get("detail"))[:60])
+check("national extent uploads", s == 200, f"status {s}")
+s, m = req("/api/analysis", {"aoi_type": "upload", "upload_id": m["upload_id"],
+                             "system": "rainfed", "year": "2024/25", "season": "Meher"})
+check("extent too large 422 at analysis", s == 422, str(m.get("detail"))[:60])
 s, m = req("/api/predict?lat=88&lon=39.2")
 check("out-of-range lat 422", s == 422)
 
-print("\n11. Model management is protected")
-TINY = (b"npp,rainfall,aet,soc,elevation,fertilizer,planting_dekad,improved_seed,"
-        b"extension_visits,market_dist,wwp\n800,700,400,1.3,2300,90,4,1,2,15,1.0\n")
-ADMIN = os.environ.get("WWP_ADMIN_TOKEN", "")
-
-s, m = multipart("/api/model/retrain", "tiny.csv", TINY)
-if ADMIN:
-    check("retrain without a token is rejected", s == 401, str(m.get("detail"))[:60])
-    s, m = multipart("/api/model/retrain", "tiny.csv", TINY, headers={"X-Admin-Token": "wrong"})
-    check("retrain with a wrong token is rejected", s == 401, str(m.get("detail"))[:60])
-    # Authorized requests reach validation.
-    hdr = {"X-Admin-Token": ADMIN}
-    s, m = multipart("/api/model/retrain", "tiny.csv", TINY, headers=hdr)
-    check("authorized retrain too few rows 422", s == 422, str(m.get("detail"))[:60])
-    s, m = multipart("/api/model/retrain", "wrong.csv", b"a,b,c\n1,2,3\n", headers=hdr)
-    check("authorized retrain missing columns 422", s == 422, str(m.get("detail"))[:70])
+print("\n11. WaPOR provider self-check")
+s, wc = req("/api/wapor/check")
+check("wapor check 200", s == 200 and "checks" in wc, f"ok={wc.get('ok')}")
+named = {c["check"]: c for c in wc["checks"]}
+# The live FAO catalogue contract this provider depends on. Skipped rather than
+# failed when the service is unreachable, so the suite still runs offline.
+if any("Cannot reach" in c["detail"] for c in wc["checks"]):
+    print("     (FAO catalogue unreachable — skipping live contract checks)")
 else:
-    # Fails closed: a deployment that forgets the token cannot replace the model.
-    check("retrain disabled when no token is configured", s == 503,
-          str(m.get("detail"))[:70])
-    print("     (set WWP_ADMIN_TOKEN on the server and in this env to test the "
-          "authorized paths)")
+    check("NPP and AETI mapsets exist",
+          all(c["ok"] for k, c in named.items() if k.endswith("catalogue entry")))
+    unit_checks = [c for k, c in named.items() if k.endswith("/day")]
+    check("mapset units are as assumed",
+          bool(unit_checks) and all(c["ok"] for c in unit_checks),
+          "; ".join(f"{c['check']}={c['ok']}" for c in unit_checks))
+    raster_checks = [c for k, c in named.items() if "raster exists" in k]
+    check("the configured dekadal rasters are published",
+          bool(raster_checks) and all(c["ok"] for c in raster_checks),
+          "; ".join(f"{c['check']}={c['ok']}" for c in raster_checks))
+    # The level the provider reads is what the dashboard reports as its
+    # resolution, so a silent fall back to the 300 m global product would
+    # overstate nothing but understate the detail actually available.
+    s2, meth = req("/api/method")
+    check("provider resolution is the L2 national 100 m",
+          wc.get("level") == "L2" and meth.get("resolution_m") == 100,
+          f"level={wc.get('level')} resolution={meth.get('resolution_m')}")
 
 print("\n12. SPA is served")
 s, html = req("/", raw=True)

@@ -13,21 +13,10 @@ import { useState } from 'react'
 
 export const RAMP_HEX = ['#93bd82', '#6ba763', '#458b4b', '#297038', '#0f4d26']
 const SERIES = '#297038'      // single-series mark colour
-const POS = '#d97a1e'         // diverging: raises the prediction
-const NEG = '#1f6f9c'         // diverging: lowers the prediction
 const GRID = '#eceee8'
 const AXIS_INK = '#8a988f'
 const LABEL_INK = '#33413a'
 const SURFACE = '#ffffff'
-
-/* Bin index for a WWP value, matching the backend histogram edges. */
-export function rampIndex(v) {
-  if (v < 0.6) return 0
-  if (v < 0.9) return 1
-  if (v < 1.2) return 2
-  if (v < 1.5) return 3
-  return 4
-}
 
 /* ── shared shell: chart + tooltip + table toggle ─────────────────────── */
 function ChartShell({ children, tip, table, tableLabel = 'table' }) {
@@ -192,145 +181,123 @@ export function HistChart({ data }) {
   )
 }
 
-/* ── Feature importance: one series, one colour ──────────────────────── */
-export function FeatureChart({ data }) {
+
+/* ── Per-scheme bars: the reference notebook's two figures ───────────────
+ * Notebook cells 30 and 31 plot estimated yield and water productivity per
+ * scheme. Same encoding here (one bar per plot, ordered as the table is), with
+ * the house conventions added: a tooltip, a table view, and labels in text
+ * tokens rather than in the mark colour.
+ */
+export function SchemeBars({ data, valueKey, unit, label, digits = 2 }) {
   const [tip, setTip] = useState(null)
-  const rows = data.slice(0, 10)
-  const rh = 13, gap = 4
-  const W = 320, H = rows.length * (rh + gap) + 8
-  const x0 = 132, xw = 158
+  const W = 320, yBase = 96, maxH = 70
+  const rows = data.filter((d) => typeof d[valueKey] === 'number')
+  if (!rows.length) return <p className="note">No values to plot.</p>
+  const slot = (W - 24) / rows.length
+  const bw = Math.min(28, Math.max(4, slot - 2))
+  const peak = Math.max(...rows.map((d) => d[valueKey]), 0.001)
+  // Long names on a narrow slot are unreadable at any angle, so they are
+  // clipped to what fits and the full name stays in the tooltip and table.
+  const maxChars = Math.max(3, Math.floor(slot / 4.6))
+  const short = (t) => (t.length > maxChars ? t.slice(0, maxChars - 1) + '…' : t)
 
   return (
     <ChartShell
       tip={tip}
-      tableLabel="values"
       table={
         <table className="dtable">
-          <caption className="sr-only">Model feature importance</caption>
-          <thead><tr><th scope="col">Feature</th><th scope="col">Relative importance</th></tr></thead>
-          <tbody>
-            {rows.map((f) => (
-              <tr key={f.feature}><td>{f.label}</td><td className="num">{f.importance.toFixed(0)}</td></tr>
-            ))}
-          </tbody>
-        </table>
-      }
-    >
-      <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} role="img"
-        aria-label={'Bar chart of relative feature importance. Most important: ' +
-          rows.slice(0, 3).map((f) => f.label).join(', ') + '.'}
-        onMouseLeave={() => setTip(null)}>
-        {rows.map((f, i) => {
-          const y = 4 + i * (rh + gap)
-          const w = Math.max(1.5, (xw * f.importance) / 100)
-          const r = Math.min(4, w)
-          return (
-            <g key={f.feature}>
-              <text x={x0 - 7} y={y + rh - 3.5} fontSize="9.5" fill={LABEL_INK} textAnchor="end">{f.label}</text>
-              {/* 4px rounded data-end, square at the x0 baseline. */}
-              <path d={`M${x0},${y} L${x0 + w - r},${y} Q${x0 + w},${y} ${x0 + w},${y + r}
-                        L${x0 + w},${y + rh - r} Q${x0 + w},${y + rh} ${x0 + w - r},${y + rh}
-                        L${x0},${y + rh} Z`} fill={SERIES} />
-              <text x={x0 + w + 5} y={y + rh - 3.5} fontSize="9" fill={AXIS_INK}
-                fontVariant="tabular-nums">{f.importance.toFixed(0)}</text>
-              <rect x={0} y={y - gap / 2} width={W} height={rh + gap} fill="transparent"
-                onMouseEnter={() => setTip({
-                  x: '50%', y: y - 2,
-                  rows: [{ label: f.label, value: `${f.importance.toFixed(0)} / 100` }],
-                })} />
-            </g>
-          )
-        })}
-      </svg>
-    </ChartShell>
-  )
-}
-
-/* ── Prediction explanation: diverging contributions ─────────────────── */
-export function ShapChart({ data }) {
-  const [tip, setTip] = useState(null)
-  const rows = data.contributions
-  const rh = 14, gap = 7
-  const W = 320, H = rows.length * (rh + gap) + 34
-  const x0 = 128, xm = 214, arm = 78
-  const peak = Math.max(...rows.map((r) => Math.abs(r.contribution)), 0.01)
-
-  return (
-    <ChartShell
-      tip={tip}
-      tableLabel="values"
-      table={
-        <table className="dtable">
-          <caption className="sr-only">Feature contributions to this prediction</caption>
+          <caption className="sr-only">{label} by scheme</caption>
           <thead>
-            <tr><th scope="col">Feature</th><th scope="col">Value</th><th scope="col">Effect (kg/m³)</th></tr>
+            <tr>
+              <th scope="col">Scheme</th><th scope="col">Code</th>
+              <th scope="col">{label} ({unit})</th>
+            </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.feature}>
-                <td>{r.label}</td>
-                <td className="num">{r.value.toLocaleString()} {r.unit}</td>
-                <td className="num">{r.contribution >= 0 ? '+' : ''}{r.contribution.toFixed(3)}</td>
+            {rows.map((d, i) => (
+              <tr key={i}>
+                <td>{d.label}</td><td>{d.scheme}</td>
+                <td className="num">{d[valueKey].toFixed(digits)}</td>
               </tr>
             ))}
-            <tr>
-              <td><b>Base → prediction</b></td>
-              <td className="num">{data.base.toFixed(2)}</td>
-              <td className="num"><b>{data.prediction.toFixed(2)}</b></td>
-            </tr>
           </tbody>
         </table>
       }
     >
-      <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} role="img"
-        aria-label={`Diverging bar chart. Base value ${data.base.toFixed(2)} to prediction ${data.prediction.toFixed(2)} kilograms per cubic metre. ` +
-          rows.map((r) => `${r.label} ${r.contribution >= 0 ? 'raises' : 'lowers'} it by ${Math.abs(r.contribution).toFixed(2)}`).join('; ') + '.'}
+      <svg width="100%" height={124} viewBox={`0 0 ${W} 124`} role="img"
+        aria-label={`Column chart of ${label} in ${unit} by scheme: ` +
+          rows.map((d) => `${d.label}, ${d[valueKey].toFixed(digits)}`).join('; ') + '.'}
         onMouseLeave={() => setTip(null)}>
-        <text x={xm} y={11} fontSize="9.5" fill={AXIS_INK} textAnchor="middle">
-          base {data.base.toFixed(2)} → prediction {data.prediction.toFixed(2)} kg/m³
-        </text>
-        {/* Neutral zero line: the diverging midpoint reads as "no effect". */}
-        <line x1={xm} y1={18} x2={xm} y2={H - 16} stroke="#c9cfc6" strokeWidth="1" />
-        {rows.map((r, i) => {
-          const y = 22 + i * (rh + gap)
-          const w = Math.max(1.5, (Math.abs(r.contribution) / peak) * arm)
-          const up = r.contribution >= 0
-          const x = up ? xm : xm - w
-          const rr = Math.min(4, w)
-          const d = up
-            ? `M${xm},${y} L${x + w - rr},${y} Q${x + w},${y} ${x + w},${y + rr}
-               L${x + w},${y + rh - rr} Q${x + w},${y + rh} ${x + w - rr},${y + rh} L${xm},${y + rh} Z`
-            : `M${xm},${y} L${x + rr},${y} Q${x},${y} ${x},${y + rr}
-               L${x},${y + rh - rr} Q${x},${y + rh} ${x + rr},${y + rh} L${xm},${y + rh} Z`
+        <line x1={12} y1={yBase} x2={W - 12} y2={yBase} stroke={GRID} strokeWidth="1" />
+        {rows.map((d, i) => {
+          const v = d[valueKey]
+          const h = v <= 0 ? 0 : Math.max(2, (v / peak) * maxH)
+          const x = 12 + i * slot + (slot - bw) / 2
+          const y = yBase - h
+          const r = Math.min(4, h)
           return (
-            <g key={r.feature}>
-              <text x={x0 - 7} y={y + rh - 3.5} fontSize="9.5" fill={LABEL_INK} textAnchor="end">{r.label}</text>
-              <path d={d} fill={up ? POS : NEG} />
-              {/* Signed value label: direction is encoded by side AND by sign,
-                  so the diverging hues are never the only channel. */}
-              <text x={up ? x + w + 5 : x - 5} y={y + rh - 3.5} fontSize="9" fontWeight="700"
-                fill={LABEL_INK} textAnchor={up ? 'start' : 'end'}>
-                {up ? '+' : '−'}{Math.abs(r.contribution).toFixed(2)}
-              </text>
-              <rect x={0} y={y - gap / 2} width={W} height={rh + gap} fill="transparent"
+            <g key={i}>
+              {h > 0 && (
+                <path d={`M${x},${yBase} L${x},${y + r} Q${x},${y} ${x + r},${y}
+                          L${x + bw - r},${y} Q${x + bw},${y} ${x + bw},${y + r}
+                          L${x + bw},${yBase} Z`} fill={RAMP_HEX[i % RAMP_HEX.length]} />
+              )}
+              {rows.length <= 10 && (
+                <text x={x + bw / 2} y={y - 6} fontSize="9.5" fontWeight="700"
+                  fill={LABEL_INK} textAnchor="middle">{v.toFixed(digits)}</text>
+              )}
+              <text x={x + bw / 2} y={yBase + 13} fontSize="8.5" fill={AXIS_INK}
+                textAnchor="middle">{short(String(d.label))}</text>
+              <rect x={12 + i * slot} y={yBase - maxH - 12} width={slot} height={maxH + 24}
+                fill="transparent"
                 onMouseEnter={() => setTip({
-                  x: '50%', y: y - 2,
+                  x: ((12 + i * slot + slot / 2) / W) * 100 + '%', y: Math.max(0, y - 12),
                   rows: [
-                    { label: r.label, value: `${r.value.toLocaleString()} ${r.unit}` },
-                    { label: up ? 'raises WWP by' : 'lowers WWP by', value: `${Math.abs(r.contribution).toFixed(3)} kg/m³` },
+                    { label: d.label, value: `${v.toFixed(digits)} ${unit}` },
+                    ...(d.scheme ? [{ label: 'Scheme', value: d.scheme }] : []),
                   ],
                 })} />
             </g>
           )
         })}
-        {/* Legend: two series, so identity never rests on colour alone. */}
-        <g fontSize="9" fill={AXIS_INK}>
-          <rect x={x0 - 4} y={H - 12} width="8" height="8" rx="2" fill={POS} />
-          <text x={x0 + 8} y={H - 5}>raises</text>
-          <rect x={x0 + 44} y={H - 12} width="8" height="8" rx="2" fill={NEG} />
-          <text x={x0 + 56} y={H - 5}>lowers</text>
-        </g>
+        <text x={W / 2} y={122} fontSize="9" fill={AXIS_INK} textAnchor="middle">
+          {label} ({unit})
+        </text>
       </svg>
     </ChartShell>
+  )
+}
+
+
+/* ── Estimation chain: how one value was derived ─────────────────────────
+ * The method is deterministic, so the explanation is the derivation itself:
+ * each measured input, each parameter applied, each intermediate. Laid out as
+ * text rather than as a chart because every element here IS a number with a
+ * name — there is no magnitude comparison a mark would make clearer.
+ */
+const fmtValue = (v) =>
+  Math.abs(v) >= 100 ? Math.round(v).toLocaleString() : v.toFixed(v < 10 ? 3 : 1)
+
+export function ChainChart({ steps }) {
+  return (
+    <ol className="chain">
+      {steps.map((s) => (
+        <li key={s.step} className={s.role}>
+          {s.role !== 'source' && (
+            <div className="op" aria-hidden="true">
+              <span className="sym">{s.role === 'divisor' ? '÷' : s.role === 'result' ? '=' : '×'}</span>
+              <span>{s.detail}</span>
+            </div>
+          )}
+          <div className="node">
+            <span className="nm">{s.step}</span>
+            <span className="val">
+              {fmtValue(s.value)}<em>{s.unit}</em>
+            </span>
+          </div>
+          {s.role === 'source' && <div className="src">{s.detail}</div>}
+        </li>
+      ))}
+    </ol>
   )
 }

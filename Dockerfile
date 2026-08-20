@@ -14,10 +14,11 @@ RUN npm run build
 # ── Stage 2: Python runtime ───────────────────────────────────────────────
 FROM python:3.11-slim AS runtime
 
-# libgomp1 is LightGBM's OpenMP runtime; the slim image omits it and inference
-# fails at import time without it.
+# curl serves the platform health check. The estimation itself is pure numpy,
+# so no native maths runtime is needed. Enabling the WaPOR provider additionally
+# requires rasterio/GDAL — see backend/requirements.txt.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libgomp1 curl \
+ && apt-get install -y --no-install-recommends curl \
  && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONUNBUFFERED=1 \
@@ -32,11 +33,13 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 COPY backend/ ./backend/
 COPY --from=frontend /build/dist ./frontend/dist
 
-# Train the model during the build so the image ships ready to serve. Training
-# at startup instead would make the first request wait ~40s and risk tripping
-# the platform health check before the service ever reports healthy.
 WORKDIR /app/backend
-RUN python train_model.py
+
+# Fail the build rather than ship an image whose estimates disagree with the
+# reference notebook. Costs a second and catches a bad crop_params.json or an
+# accidental change to the estimation chain before it can reach a deployment.
+COPY tests/test_notebook_parity.py ./parity_check.py
+RUN python parity_check.py && rm parity_check.py
 
 # Run as an unprivileged user.
 RUN useradd --create-home --uid 10001 wwp && chown -R wwp:wwp /app

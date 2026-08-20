@@ -26,7 +26,7 @@ async function request(path, options = {}) {
 
 export const getAdminUnits = () => request('/admin-units')
 
-export const getModelInfo = () => request('/model/info')
+export const getMethod = () => request('/method')
 
 export function runAnalysis(payload, idempotencyKey) {
   return request('/analysis', {
@@ -42,10 +42,29 @@ export function uploadBoundary(file) {
   return request('/upload', { method: 'POST', body: form })
 }
 
+export const getSchemeSample = () => request('/schemes/sample')
+
+/* Scheme files the service can hand over to be loaded: the 2026 campaign
+   shapefiles where the machine has them, and the generated sample always. */
+export const getSchemeDatasets = () => request('/schemes/datasets')
+
+export const getSchemeDataset = (name) =>
+  request('/schemes/dataset?name=' + encodeURIComponent(name))
+
+export function runSchemeAnalysis(uploadId, idempotencyKey) {
+  return request('/schemes/analysis', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'idempotency-key': idempotencyKey },
+    body: JSON.stringify({ upload_id: uploadId }),
+  })
+}
+
 const qs = (o) => new URLSearchParams(o).toString()
 
 export const predictPoint = (p) => request('/predict?' + qs(p))
 export const explainPoint = (p) => request('/explain?' + qs(p))
 export const csvUrl = (runId) => `${BASE}/export/csv?run_id=${encodeURIComponent(runId)}`
+export const schemeCsvUrl = (runId, level = 'features') =>
+  `${BASE}/schemes/export/csv?run_id=${encodeURIComponent(runId)}&level=${level}`
 
 export { ApiError }

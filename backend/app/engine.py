@@ -1,9 +1,13 @@
 """WWPT analytical engine.
 
-Orchestrates one analysis run: AOI grid construction, feature assembly from
-the data-access layer, LightGBM inference, raster rendering, zonal statistics,
-class distribution and the multi-season trend. Mirrors the original
-Python WWPT pipeline (WaPOR NPP -> features -> productivity) as a service.
+Orchestrates one analysis run: AOI grid construction, seasonal WaPOR retrieval,
+the WWPT biomass-to-yield estimation, raster rendering, zonal statistics, class
+distribution and the multi-season trend.
+
+The estimate itself is deterministic — ``wwpt.estimate`` applied per grid cell —
+so every number on the dashboard can be traced back through the chain that
+produced it. That is what ``estimation_chain`` below builds, and it is what the
+interface shows in place of a model explanation.
 """
 
 from __future__ import annotations
@@ -15,8 +19,8 @@ import uuid
 import numpy as np
 
 from . import aoi as aoi_mod
-from .geodata import PROVIDER, YEARS, feature_matrix, wheat_mask
-from .model_service import MODEL
+from . import wwpt
+from .geodata import PROVIDER, YEARS, wheat_mask
 from .pnglib import encode_png
 
 GRID_N = 170          # analysis raster resolution (cells per axis)
@@ -68,6 +72,52 @@ def _area_ha(bounds, n_cells, grid_n):
     return total_km2 * 100.0 * n_cells / (grid_n * grid_n)
 
 
+def estimation_chain(npp, aeti_mm, wwp=None) -> list[dict]:
+    """The NPP -> biomass -> yield -> water-productivity derivation, step by step.
+
+    Every step but the last is linear in NPP, so applying the chain to mean NPP
+    gives exactly the mean biomass and the mean yield. Water productivity is a
+    ratio and does not commute with averaging, so when an area mean is supplied
+    it is used for the final step rather than the ratio of the means — the two
+    differ, and the honest number is the mean of the per-cell values.
+    """
+    p = wwpt.PARAMS
+    npp = float(np.mean(npp))
+    aeti_mm = float(np.mean(aeti_mm))
+    tb = float(wwpt.total_biomass(npp))
+    y = tb * p.hi
+    swc = float(wwpt.seasonal_water(aeti_mm))
+    # 'role' tells the interface how to draw each step: a source measurement, a
+    # value derived from the one above it, the divisor branch, or the result.
+    return [
+        {"role": "source", "step": "Seasonal NPP",
+         "value": round(npp, 1), "unit": "gC/m²",
+         "detail": "FAO WaPOR v3, summed over the growing season"},
+        {"role": "derived", "step": "Total biomass",
+         "value": round(tb), "unit": "kg DM/ha",
+         "detail": f"AOT {p.aot} × fc {p.fc} × 22.222 ÷ (1 − mc {p.mc})"},
+        {"role": "derived", "step": "Grain yield",
+         "value": round(y), "unit": "kg/ha",
+         "detail": f"harvest index {p.hi}"},
+        {"role": "divisor", "step": "Water consumed",
+         "value": round(swc), "unit": "m³/ha",
+         "detail": f"seasonal AETI {aeti_mm:.0f} mm × 10"},
+        {"role": "result", "step": "Water productivity",
+         "value": round(float(np.mean(wwp)) if wwp is not None else y / swc, 3),
+         "unit": "kg/m³", "detail": "grain yield ÷ water consumed"},
+    ]
+
+
+def _season_meta(feats: dict) -> dict:
+    sos, eos = feats["sos"], feats["eos"]
+    return {
+        "sos": sos.isoformat(),
+        "eos": eos.isoformat(),
+        "lgp_days": wwpt.lgp_days(sos, eos),
+        "n_dekads": feats.get("n_dekads"),
+    }
+
+
 def run_analysis(aoi: dict, system: str, year: str, season: str) -> dict:
     lat2d, lon2d = _grid(aoi["bounds"], GRID_N)
     inside = aoi_mod.mask_for(aoi, lat2d, lon2d)
@@ -77,7 +127,8 @@ def run_analysis(aoi: dict, system: str, year: str, season: str) -> dict:
         raise aoi_mod.AOIError("No wheat area found inside the selected extent.")
 
     feats = PROVIDER.assemble(lat2d[mask], lon2d[mask], system, year, season)
-    wwp = MODEL.predict(feature_matrix(feats))
+    est = wwpt.estimate(feats["npp"], feats["aeti"])
+    wwp = est["wwp_kg_m3"]
 
     # Raster (RGBA, transparent outside AOI / non-wheat cells).
     rgba = np.zeros((GRID_N, GRID_N, 4), dtype=np.uint8)
@@ -101,17 +152,6 @@ def run_analysis(aoi: dict, system: str, year: str, season: str) -> dict:
         share = float(np.mean((wwp >= HIST_EDGES[i]) & (wwp < HIST_EDGES[i + 1])))
         hist.append({"label": HIST_LABELS[i], "pct": round(share * 100.0, 1)})
 
-    # 5-season trend on a coarse grid (same extent, same season & system).
-    tlat, tlon = _grid(aoi["bounds"], TREND_N)
-    tmask = aoi_mod.mask_for(aoi, tlat, tlon) & wheat_mask(tlat, tlon)
-    trend = []
-    for yr in sorted(YEARS):
-        tf = PROVIDER.assemble(tlat[tmask], tlon[tmask], system, yr, season)
-        trend.append({
-            "year": yr,
-            "mean": round(float(MODEL.predict(feature_matrix(tf)).mean()), 3),
-        })
-
     mean = stats["mean"]
     run_id = uuid.uuid4().hex[:12]
     result = {
@@ -123,15 +163,20 @@ def run_analysis(aoi: dict, system: str, year: str, season: str) -> dict:
         "season": season,
         "raster_png": "data:image/png;base64," + png_b64,
         "stats": stats,
-        "yield_t_ha": round(mean * 3.1, 2),
-        "et_mm": int(round(float(feats["aet"].mean()))),
+        "yield_t_ha": round(float(est["yield_t_ha"].mean()), 2),
+        "et_mm": int(round(float(feats["aeti"].mean()))),
         "npp_mean": int(round(float(feats["npp"].mean()))),
+        "biomass_kg_ha": int(round(float(est["biomass_kg_ha"].mean()))),
         "area_ha": int(round(_area_ha(aoi["bounds"], n, GRID_N))),
         "gap_pct": max(0, round((ATTAINABLE_WWP - mean) / ATTAINABLE_WWP * 100.0)),
         "histogram": hist,
-        "trend": trend,
-        "feature_importance": MODEL.importance(),
-        "model_version": MODEL.meta.get("version"),
+        "trend": _trend(aoi, system, season, wheat_mask),
+        "chain": estimation_chain(feats["npp"], feats["aeti"], wwp),
+        "season_window": _season_meta(feats),
+        "method": wwpt.method_info(),
+        "provider": PROVIDER.name,
+        "synthetic": getattr(PROVIDER, "synthetic", False),
+        "resolution_m": getattr(PROVIDER, "resolution_m", None),
     }
     RUNS[run_id] = {"aoi": aoi, "system": system, "year": year, "season": season}
     if len(RUNS) > 100:
@@ -139,50 +184,68 @@ def run_analysis(aoi: dict, system: str, year: str, season: str) -> dict:
     return result
 
 
+def _trend(aoi: dict, system: str, season: str, mask_fn) -> list[dict]:
+    """Mean WWP across the available seasons on a coarse grid.
+
+    A season whose WaPOR dekads are not yet published is skipped rather than
+    failing the whole analysis — the current cropping year is routinely
+    incomplete, and a missing point on the trend line is far better than no
+    result at all.
+    """
+    tlat, tlon = _grid(aoi["bounds"], TREND_N)
+    tmask = aoi_mod.mask_for(aoi, tlat, tlon) & mask_fn(tlat, tlon)
+    if not tmask.any():
+        return []
+    trend = []
+    for yr in sorted(YEARS):
+        try:
+            tf = PROVIDER.assemble(tlat[tmask], tlon[tmask], system, yr, season)
+            wwp = wwpt.water_productivity(tf["npp"], tf["aeti"])
+        except Exception:  # noqa: BLE001 - any retrieval failure drops the point
+            continue
+        trend.append({"year": yr, "mean": round(float(wwp.mean()), 3)})
+    return trend
+
+
 def point_features(lat: float, lon: float, system: str, year: str, season: str):
-    feats = PROVIDER.assemble(np.array([lat]), np.array([lon]), system, year, season)
-    return feats, feature_matrix(feats)
+    return PROVIDER.assemble(np.array([lat]), np.array([lon]), system, year, season)
 
 
 def predict_point(lat, lon, system, year, season) -> dict:
-    feats, X = point_features(lat, lon, system, year, season)
-    wwp = float(MODEL.predict(X)[0])
+    feats = point_features(lat, lon, system, year, season)
+    est = wwpt.estimate(feats["npp"], feats["aeti"])
     return {
-        "wwp": round(wwp, 3),
-        "yield_t_ha": round(wwp * 3.1, 2),
-        "npp": int(round(float(feats["npp"][0]))),
-        "aet_mm": int(round(float(feats["aet"][0]))),
+        "wwp": round(float(est["wwp_kg_m3"][0]), 3),
+        "yield_t_ha": round(float(est["yield_t_ha"][0]), 2),
+        "npp": round(float(feats["npp"][0]), 1),
+        "aeti_mm": int(round(float(feats["aeti"][0]))),
         "lat": lat,
         "lon": lon,
+        "synthetic": getattr(PROVIDER, "synthetic", False),
     }
 
 
 def explain_point(lat, lon, system, year, season) -> dict:
-    from .geodata import FEATURE_LABELS, FEATURE_NAMES, FEATURE_UNITS
+    """The full derivation for one cell.
 
-    feats, X = point_features(lat, lon, system, year, season)
-    contrib, base = MODEL.explain(X)
-    wwp = float(MODEL.predict(X)[0])
-    rows = []
-    for i, name in enumerate(FEATURE_NAMES):
-        rows.append({
-            "feature": name,
-            "label": FEATURE_LABELS[name],
-            "value": round(float(feats[name][0]), 2),
-            "unit": FEATURE_UNITS[name],
-            "contribution": round(float(contrib[0, i]), 4),
-        })
-    rows.sort(key=lambda r: -abs(r["contribution"]))
+    With a deterministic method there is nothing to attribute statistically:
+    the explanation *is* the chain of equations and the parameters they used,
+    which is both complete and checkable by hand.
+    """
+    feats = point_features(lat, lon, system, year, season)
+    est = wwpt.estimate(feats["npp"], feats["aeti"])
     return {
-        "lat": lat, "lon": lon,
-        "base": round(float(base[0]), 3),
-        "prediction": round(wwp, 3),
-        "contributions": rows[:7],
-        "model_version": MODEL.meta.get("version"),
+        "lat": lat,
+        "lon": lon,
+        "wwp": round(float(est["wwp_kg_m3"][0]), 3),
+        "chain": estimation_chain(feats["npp"], feats["aeti"]),
+        "season_window": _season_meta(feats),
+        "method": wwpt.method_info(),
     }
 
 
 def export_csv(run_id: str) -> str:
+    """Grid-cell results, using the reference notebook's column names."""
     run = RUNS.get(run_id)
     if not run:
         raise aoi_mod.AOIError("Run not found — please run the analysis again.")
@@ -190,12 +253,14 @@ def export_csv(run_id: str) -> str:
     lat2d, lon2d = _grid(aoi["bounds"], CSV_N)
     mask = aoi_mod.mask_for(aoi, lat2d, lon2d) & wheat_mask(lat2d, lon2d)
     feats = PROVIDER.assemble(lat2d[mask], lon2d[mask], system, year, season)
-    wwp = MODEL.predict(feature_matrix(feats))
-    lines = ["lat,lon,wwp_kg_m3,pred_yield_t_ha,npp_kgc_ha,aet_mm"]
+    est = wwpt.estimate(feats["npp"], feats["aeti"])
+    meta = _season_meta(feats)
+    lines = ["lat,lon,SOS,EOS,LGP,NPP,AETI_mm,EYield_tpha,WP_kgpm3"]
     la, lo = lat2d[mask], lon2d[mask]
-    for i in range(len(wwp)):
+    for i in range(len(la)):
         lines.append(
-            f"{la[i]:.5f},{lo[i]:.5f},{wwp[i]:.3f},{wwp[i]*3.1:.2f},"
-            f"{feats['npp'][i]:.0f},{feats['aet'][i]:.0f}"
+            f"{la[i]:.5f},{lo[i]:.5f},{meta['sos']},{meta['eos']},{meta['lgp_days']},"
+            f"{feats['npp'][i]:.2f},{feats['aeti'][i]:.2f},"
+            f"{est['yield_t_ha'][i]:.2f},{est['wwp_kg_m3'][i]:.2f}"
         )
     return "\n".join(lines) + "\n"

@@ -1,0 +1,2129 @@
+<title>WWP Dashboard 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+/* ============================================================
+   WWP Dashboard 2026 — layout, chrome, copy and behaviour follow
+   wwp/WWP Dashboard 2026.dc.html; tokens follow
+   WWP Dashboard/frontend/src/styles.css. Light-only by design,
+   so every colour is painted explicitly.
+   ============================================================ */
+:root{
+  color-scheme:light;
+  --green-950:#0f3320; --green-900:#14432b; --green-800:#1a5735; --green-700:#1e6b3f; --green-600:#27824d;
+  --gold:#d9a03f; --gold-dark:#b07f28; --wheat:#f3e5c3;
+  --bg:#f4f5f1; --card:#ffffff; --ink:#1c2b22; --muted:#5f6f64; --line:#dfe4da; --line-2:#ccd4c7;
+  --red:#c2452d; --grid:#eceee8; --panel:#f7f9f4; --mapbg:#dfe8dc;
+  --idle-poly:#c8d4c3; --idle-pt:#b7c4b2;
+  --hdr-h:58px; --ftr-h:34px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; font-family:"Public Sans",system-ui,sans-serif; background:var(--bg); color:var(--ink);
+  font-size:14px; line-height:1.5; overflow:hidden; -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{margin:0}
+p{margin:0}
+button{font-family:inherit;cursor:pointer}
+select,input{font-family:inherit}
+a{color:var(--green-700);text-decoration:none}
+:focus-visible{outline:2px solid var(--green-600);outline-offset:2px}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;background:#f0f2ed;border-radius:3px;padding:0 3px}
+.leaflet-container{font-family:"Public Sans",system-ui,sans-serif}
+.leaflet-popup-content-wrapper{border-radius:9px}
+@keyframes bb{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1.15)}}
+
+/* ── Header ── */
+.hdr{background:var(--green-900);color:#fff;height:var(--hdr-h);display:flex;align-items:center;gap:20px;padding:0 20px;flex-shrink:0}
+.brand{display:flex;align-items:center;gap:11px}
+.brand .mark{width:36px;height:36px;border-radius:8px;flex:none;background:linear-gradient(140deg,var(--green-600),var(--green-800));display:grid;place-items:center;border:1px solid rgba(255,255,255,.25)}
+.brand .t1{font-size:15px;font-weight:800;letter-spacing:.01em;line-height:1.15}
+.brand .t2{font-size:11px;color:#bcd6c5;line-height:1.2}
+.hdr nav{display:flex;gap:4px;margin-left:12px}
+.hdr nav button{color:#d7e6dc;font-size:13px;font-weight:600;padding:7px 12px;border-radius:6px;background:transparent;border:0}
+.hdr nav button:hover{background:rgba(255,255,255,.1);color:#fff}
+.hdr nav button.on{background:rgba(255,255,255,.16);color:#fff}
+.hdr .right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.chip{border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;font-size:12px;font-weight:600;padding:5px 12px;white-space:nowrap}
+
+/* ── Panes ── */
+.app{display:flex;height:calc(100vh - var(--hdr-h) - var(--ftr-h))}
+.side{width:308px;flex-shrink:0;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow-y:auto}
+.mapwrap{flex:1;position:relative;min-width:0;background:var(--mapbg)}
+.results{width:372px;flex-shrink:0;background:var(--card);border-left:1px solid var(--line);overflow-y:auto}
+.results[hidden]{display:none}
+
+/* ── Sidebar ── */
+.sec{padding:16px 18px;border-bottom:1px solid var(--line)}
+.sec h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px}
+.seg{display:flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden;margin-bottom:8px}
+.seg button{flex:1;border:0;background:#fff;padding:8px 6px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--line-2)}
+.seg button.on{background:var(--green-700);color:#fff}
+.drawbtn{width:100%;margin-bottom:10px;padding:9px;border:0;border-radius:8px;background:var(--green-700);color:#fff;font-size:12.5px;font-weight:700}
+.drawbtn:hover{background:var(--green-800)}
+.drawbtn.armed{background:var(--green-700)}
+.drawpanel{border:1px solid var(--gold);background:#fdf7ea;border-radius:8px;padding:10px 12px;margin-bottom:10px}
+.drawpanel .t{font-size:12px;font-weight:700;color:#7a5a17}
+.drawpanel p{font-size:11.5px;color:var(--muted);line-height:1.45;margin:4px 0 8px}
+.drawpanel .fin{width:100%;margin-bottom:6px;padding:8px;border:1px solid var(--green-700);border-radius:7px;background:var(--green-700);color:#fff;font-size:12.5px;font-weight:600}
+.drawpanel .can{width:100%;padding:8px;border:1px solid var(--line-2);border-radius:7px;background:#fff;color:var(--ink);font-size:12.5px;font-weight:600}
+.drawpanel .can:hover{border-color:var(--red);color:var(--red)}
+.upload{width:100%;margin-top:8px;padding:9px;border:1.5px dashed var(--line-2);border-radius:8px;background:#fff;color:var(--green-800);font-size:12.5px;font-weight:600;line-height:1.4}
+.upload:hover{border-color:var(--green-600);background:#eef3ea}
+.err{font-size:11.5px;color:var(--red);font-weight:600;line-height:1.45;margin:8px 0 0}
+.clist{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.crow{display:flex;align-items:center;gap:8px;border-radius:7px;padding:8px 10px;font-size:12.5px;font-weight:600;color:var(--green-900);background:#fff;border:1px solid var(--line)}
+.crow.on{background:#eef3ea;border-color:var(--green-600)}
+.crow .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;flex:1;text-align:left;background:none;border:0;font:inherit;color:inherit;padding:0}
+.crow .wp{font-size:12px;font-weight:800;color:var(--green-800);font-variant-numeric:tabular-nums}
+.crow .x{border:0;background:transparent;color:var(--muted);font-size:13px;line-height:1;padding:0 0 0 2px}
+.crow .x:hover{color:var(--red)}
+.hint{font-size:11.5px;color:var(--muted);line-height:1.45;margin-top:8px}
+.disclose{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.disclose > summary{
+  cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;
+  font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--muted);
+}
+.disclose > summary::-webkit-details-marker{display:none}
+.disclose > summary::before{
+  content:"";width:0;height:0;flex:none;
+  border-left:5px solid currentColor;border-top:4px solid transparent;border-bottom:4px solid transparent;
+  transition:transform .15s ease;
+}
+.disclose[open] > summary::before{transform:rotate(90deg) translateX(-1px)}
+.disclose > summary:hover{color:var(--green-800)}
+.disclose .ds{margin-top:8px;font-size:11.5px;line-height:1.45}
+.disclose .ds .meta{color:var(--muted);margin-left:6px;white-space:nowrap}
+.disclose .ds .note{display:block;color:var(--muted)}
+.disclose .src{margin-top:8px;font-size:10.5px;color:var(--muted);line-height:1.45}
+.linkbtn{border:0;background:none;padding:0;color:var(--green-700);font-size:inherit;font-weight:700;text-decoration:underline}
+.linkbtn:hover{color:var(--green-900)}
+.hint.mid{text-align:center}
+.fld{margin-bottom:10px}
+.fld label{display:block;font-size:12px;font-weight:600;color:var(--ink);margin-bottom:4px}
+.fld select,.fld input{width:100%;padding:8px 10px;border:1px solid var(--line-2);border-radius:7px;background:#fff;font-size:13px;color:var(--ink)}
+.runbtn{width:100%;padding:11px;border:0;border-radius:8px;background:var(--green-700);color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px}
+.runbtn:hover{background:var(--green-800)}
+.runbtn:disabled{background:#9db3a4;cursor:default}
+.resetbtn{width:100%;margin-top:8px;padding:8px;border:1px solid var(--line-2);border-radius:8px;background:#fff;color:var(--ink);font-size:12.5px;font-weight:600}
+.resetbtn:hover{border-color:var(--red);color:var(--red)}
+.side .foot{margin-top:auto;padding:14px 18px;font-size:11px;color:var(--muted);line-height:1.5}
+
+/* ── Map ── */
+#map{position:absolute;inset:0}
+#map.svgmode svg{display:block;width:100%;height:100%}
+.maptip{position:absolute;left:50%;transform:translateX(-50%);top:58px;z-index:800;background:rgba(20,60,35,.92);color:#fff;font-size:12.5px;font-weight:600;padding:8px 16px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.3);max-width:calc(100% - 28px);text-align:center;line-height:1.35}
+.maptip[hidden]{display:none}
+.spin{position:absolute;inset:0;z-index:900;background:rgba(244,245,241,.65);display:flex;align-items:center;justify-content:center}
+.spin[hidden]{display:none}
+.spin .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 26px;box-shadow:0 10px 40px rgba(20,40,25,.25);text-align:center;width:300px}
+.spin .bars{display:flex;gap:5px;justify-content:center;height:26px;align-items:center;margin-bottom:10px}
+.spin .bars i{width:5px;height:22px;border-radius:3px;background:var(--green-600);display:block;animation:bb .9s ease-in-out infinite}
+.spin .bars i:nth-child(2){animation-delay:.15s;background:var(--gold)}
+.spin .bars i:nth-child(3){animation-delay:.3s}
+.spin p{font-size:13px;font-weight:600;color:var(--ink);margin:0 0 8px}
+.spin .track{height:8px;border-radius:4px;background:var(--grid);overflow:hidden}
+.spin .track i{display:block;height:100%;background:var(--green-600);transition:width .3s}
+.spin small{font-size:11.5px;color:var(--muted);display:block;margin-top:8px;font-variant-numeric:tabular-nums}
+.mapsearch{
+  position:absolute;top:14px;left:58px;z-index:801;display:flex;align-items:stretch;
+  background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:8px;
+  box-shadow:0 3px 12px rgba(20,40,25,.18);
+  /* leave room for the zoom control on the left and the basemap switch on the
+     right, so the three never overlap at any width */
+  width:min(300px, calc(100% - 58px - 14px - 170px));
+}
+.mapsearch[hidden]{display:none}
+.mapsearch input{
+  flex:1;min-width:0;border:0;background:transparent;padding:8px 10px;
+  font-size:12.5px;color:var(--ink);border-radius:8px 0 0 8px;
+}
+.mapsearch input::placeholder{color:var(--muted)}
+.mapsearch button{
+  border:0;border-left:1px solid var(--line);background:transparent;color:var(--green-700);
+  padding:0 11px;display:grid;place-items:center;border-radius:0 8px 8px 0;
+}
+.mapsearch button:hover{background:#eef3ea;color:var(--green-900)}
+.mapsearch ul{
+  position:absolute;top:calc(100% + 6px);left:0;right:0;margin:0;padding:4px;
+  list-style:none;background:#fff;border:1px solid var(--line);border-radius:8px;
+  box-shadow:0 6px 20px rgba(20,40,25,.22);max-height:230px;overflow-y:auto;
+}
+.mapsearch ul[hidden]{display:none}
+.mapsearch li button{
+  width:100%;border:0;border-radius:6px;background:transparent;text-align:left;
+  padding:7px 8px;display:block;color:var(--ink);font-size:12px;line-height:1.35;
+}
+.mapsearch li button:hover{background:#eef3ea}
+.mapsearch li .k{
+  display:block;font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.04em;color:var(--muted);
+}
+.mapsearch li .none{padding:7px 8px;font-size:12px;color:var(--muted)}
+.mapctl{
+  position:absolute;top:14px;right:14px;z-index:800;display:flex;
+  background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:8px;
+  box-shadow:0 3px 12px rgba(20,40,25,.18);overflow:hidden;
+}
+.mapctl[hidden]{display:none}
+.mapctl button{
+  border:0;background:transparent;color:var(--muted);
+  font-size:12px;font-weight:600;padding:7px 14px;line-height:1.2;white-space:nowrap;
+}
+.mapctl button+button{border-left:1px solid var(--line)}
+.mapctl button:hover{background:#eef3ea;color:var(--green-800)}
+.mapctl button.on{background:var(--green-700);color:#fff}
+.mapctl button.on:hover{background:var(--green-800);color:#fff}
+.legend{position:absolute;right:14px;bottom:26px;z-index:800;background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:9px;padding:12px 14px;box-shadow:0 4px 18px rgba(20,40,25,.18);width:196px}
+.legend[hidden]{display:none}
+.legend h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px}
+.legend .ramp{height:10px;border-radius:5px;background:linear-gradient(90deg,#93bd82,#6ba763,#458b4b,#297038,#0f4d26)}
+.legend .ramplbl{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
+.legend .rampu{display:flex;justify-content:center;font-size:10.5px;color:var(--muted);margin-top:2px;text-align:center;line-height:1.35}
+.mapnote{position:absolute;left:14px;bottom:14px;z-index:700;background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:7px;padding:6px 10px;font-size:10.5px;color:var(--muted);max-width:300px;line-height:1.4}
+.mapnote[hidden]{display:none}
+.grat{stroke:#c8d4c3;stroke-width:1}
+.gratl{fill:#7e8c80;font-size:10px;font-variant-numeric:tabular-nums}
+.sbar{stroke:var(--ink);stroke-width:1.5}
+.sbarl{fill:var(--ink);font-size:10.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.flabel{fill:var(--green-950);font-size:11.5px;font-weight:700;paint-order:stroke;stroke:rgba(255,255,255,.85);stroke-width:3}
+
+/* ── Results ── */
+.rhead{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:10px;position:sticky;top:0;background:#fff;z-index:5}
+.rhead h2{font-size:15px;font-weight:800}
+.rhead .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+.rhead .back{border:1px solid var(--line-2);background:#fff;border-radius:7px;width:28px;height:28px;font-size:14px;color:var(--green-800);flex-shrink:0}
+.rhead .back:hover{background:#eef3ea;border-color:var(--green-700)}
+.badge{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--wheat);color:#7a5a17;margin-left:6px;vertical-align:2px}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 18px}
+.kpi{border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:#fff}
+.kpi.hero{grid-column:1/-1;border:0;color:#fff;background:linear-gradient(135deg,var(--green-800),var(--green-600))}
+.kpi .l{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.kpi.hero .l{color:#cfe6d6}
+.kpi .v{font-size:21px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi.hero .v{font-size:34px;line-height:1.1}
+.kpi .u{font-size:11.5px;font-weight:600;color:var(--muted)}
+.kpi.hero .u{color:#cfe6d6}
+.gp{margin:0 18px 14px;border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:#fff;display:flex;align-items:center;gap:12px}
+.gp .l{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.gp .d{font-size:13px;font-weight:700;margin-top:3px}
+.gp .r{text-align:right;margin-left:auto}
+.gp .r .n{font-size:21px;font-weight:800;color:var(--green-800);font-variant-numeric:tabular-nums}
+.gp .r .u{font-size:11px;color:var(--muted);font-weight:600}
+.chartsec{padding:0 18px 16px}
+.chartsec h3{font-size:12.5px;font-weight:700;margin-bottom:2px}
+.chartsec .note{font-size:11px;color:var(--muted);margin-bottom:8px}
+.chartbox{border:1px solid var(--line);border-radius:9px;background:#fff;padding:12px 12px 10px}
+.banner{margin:14px 18px 0;padding:10px 12px;border-radius:9px;background:var(--wheat);border:1px solid #e3cf9c;color:#6b4e12;font-size:11.5px;line-height:1.5}
+.banner b{font-weight:800}
+.cc{display:flex;gap:6px}
+.cc .ax{width:26px;height:150px;position:relative;flex-shrink:0}
+.cc .ax i{position:absolute;right:0;transform:translateY(-50%);font-size:9.5px;line-height:1;color:var(--muted);font-variant-numeric:tabular-nums;font-style:normal}
+.cc .pl{flex:1;position:relative;height:150px;border-left:1px solid var(--line-2);border-bottom:1px solid var(--line-2)}
+.cc .pl hr{position:absolute;left:0;right:0;border:0;border-top:1px solid var(--grid);margin:0}
+.cc .bars{position:absolute;inset:0;display:flex;align-items:flex-end;gap:7px;padding:0 7px}
+.cc .bar{flex:1;height:100%;position:relative;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:2px;min-width:0;cursor:pointer;background:none;border:0;padding:0}
+.cc .bar .v{font-size:9.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.cc .bar .b{width:100%;border-radius:3px 3px 0 0;max-height:calc(100% - 14px)}
+.cc .bar .t{position:absolute;top:100%;left:-4px;right:-4px;margin-top:5px;text-align:center;font-size:9.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc .bar.on .t{color:var(--green-800);font-weight:700}
+.ccpad{height:16px}
+.dtable{width:100%;border-collapse:collapse;font-size:11px}
+.dtable th{text-align:right;padding:6px 6px 3px 0;border-bottom:1px solid var(--line);color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;font-size:10px}
+.dtable th:first-child,.dtable td:first-child{text-align:left}
+.dtable td{text-align:right;padding:4px 6px 4px 0;border-bottom:1px solid var(--grid);font-variant-numeric:tabular-nums}
+.dtable td.wp{font-weight:700;color:var(--green-800)}
+.dtable tr:last-child td{border-bottom:0}
+.tbox{border:1px solid var(--line);border-radius:9px;background:#fff;max-height:230px;overflow-y:auto;padding:2px 10px 6px}
+.valbtn{width:100%;padding:9px;border:1px solid var(--line-2);border-radius:8px;background:#fff;color:var(--green-800);font-size:12.5px;font-weight:600}
+.valbtn:hover{border-color:var(--green-600);background:#eef3ea}
+.valbox{border:1px solid var(--line);border-radius:9px;background:#fff;padding:8px 10px 10px;margin-top:10px}
+.valhd{display:flex;align-items:center;gap:8px;padding:0 2px 6px;border-bottom:1px solid var(--line)}
+.valhd span{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.valgrp{display:flex;align-items:baseline;gap:6px;padding:8px 2px 2px}
+.valgrp b{font-size:11px;font-weight:700;color:var(--green-900);text-transform:uppercase;letter-spacing:.05em}
+.valgrp i{font-size:10.5px;color:var(--muted);font-style:normal}
+.valrow{display:flex;align-items:center;gap:8px;padding:4px 2px;border-bottom:1px solid var(--grid)}
+.valrow .lb{width:74px;font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.valrow .est{width:46px;text-align:right;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.valrow input{width:62px;padding:4px 6px;border:1px solid var(--line-2);border-radius:6px;font-size:11.5px;color:var(--ink);text-align:right}
+.valrow .df{flex:1;text-align:right;font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.w74{width:74px}.w46{width:46px;text-align:right}.w62{width:62px;text-align:right}.fl1{flex:1;text-align:right}
+.valstats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}
+.valstats div{border:1px solid var(--line);border-radius:8px;padding:8px 9px;background:var(--panel)}
+.valstats .l{font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.valstats .v{font-size:16px;font-weight:800;color:var(--green-900);font-variant-numeric:tabular-nums}
+.exportrow{display:flex;gap:8px;padding:0 18px 20px}
+.exportrow button{flex:1;padding:9px;border-radius:7px;font-size:12.5px;font-weight:600;border:1px solid var(--line-2);background:#fff;color:var(--ink)}
+.exportrow button:hover:not(:disabled){border-color:var(--green-700);color:var(--green-800)}
+.exportrow button:disabled{opacity:.5;cursor:default}
+
+/* ── Footer ── */
+.ftr{height:var(--ftr-h);background:#fff;border-top:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 20px;font-size:11px;color:var(--muted);flex-shrink:0;overflow-x:auto;white-space:nowrap}
+.ftr .dot{width:3px;height:3px;border-radius:50%;background:var(--line-2);flex:none}
+
+/* ── Modals ── */
+.modal{position:fixed;inset:0;z-index:2000;background:rgba(15,40,25,.45);display:flex;align-items:center;justify-content:center;padding:24px}
+.modal[hidden]{display:none}
+.modal .box{background:#fff;border-radius:12px;width:100%;max-width:640px;max-height:82vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.4)}
+.modal.sm .box{max-width:430px}
+.modal.wide .box{max-width:860px;max-height:88vh}
+.modal .mh{padding:16px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#fff;z-index:2}
+.modal .mh h2{font-size:16px;font-weight:800}
+.modal .mh .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+.modal .mh button{margin-left:auto;border:0;background:transparent;font-size:20px;color:var(--muted);line-height:1}
+.modal .mb{padding:18px 22px;font-size:13px;line-height:1.65;color:#33413a}
+.modal .mb h4{font-size:13px;font-weight:700;margin:14px 0 4px;color:var(--ink)}
+.modal .mb h4:first-child{margin-top:0}
+.modal .mb p{margin-bottom:8px}
+.modal .mb ul,.modal .mb ol{padding-left:20px;margin-bottom:8px}
+.modal .mb li{margin-bottom:4px}
+.eqbox{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.9;margin:0 0 8px;overflow-x:auto}
+.helpsec{display:flex;flex-direction:column;gap:22px}
+.helpsec h3{font-size:13.5px;font-weight:800;color:var(--green-900);margin-bottom:6px}
+.cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.cards2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cards3 div,.cards2 div{border:1px solid var(--line);border-radius:9px;padding:11px 13px;background:var(--panel)}
+.cards2 div{background:#fff}
+.cards3 .st{font-size:11px;font-weight:700;color:var(--green-700);text-transform:uppercase;letter-spacing:.05em}
+.cards3 .hd{font-weight:700;margin-top:3px}
+.cards3 p,.cards2 p{margin:4px 0 0;font-size:12px;color:var(--muted)}
+.atable{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:8px}
+.atable th,.atable td{text-align:left;padding:5px 10px 5px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.atable th{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:700}
+.atable td:first-child{font-weight:700;white-space:nowrap}
+.mfoot{margin:0;padding-top:4px;border-top:1px solid var(--grid);font-size:12px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:96px 1fr;gap:10px;margin-bottom:10px}
+.grid11{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+/* The dialog's fields are not .fld, so they need their own label/input rules —
+   without these the labels stay inline and the row wraps into a jumble. */
+.modal .mb label{display:block;font-size:12px;font-weight:600;color:var(--ink);margin-bottom:4px}
+.modal .mb input{
+  width:100%;padding:8px;border:1px solid var(--line-2);border-radius:7px;
+  background:#fff;font-size:12.5px;color:var(--ink);
+}
+.modal .mb input:focus-visible{outline:2px solid var(--green-600);outline-offset:1px}
+.mrow{display:flex;gap:8px}
+.mrow .discard{width:110px;padding:10px;border:1px solid var(--line-2);border-radius:8px;background:#fff;color:var(--ink);font-size:13px;font-weight:600}
+.mrow .discard:hover{border-color:var(--red);color:var(--red)}
+.mrow .add{flex:1;padding:10px;border:0;border-radius:8px;background:var(--green-700);color:#fff;font-size:13px;font-weight:700}
+.mrow .add:hover{background:var(--green-800)}
+
+/* ── Popup / tooltip ── */
+.pop .ph{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.pop .pv{font-size:20px;font-weight:800;color:var(--green-800)}
+.pop .pu{font-size:11px;color:var(--muted)}
+.pop table{font-size:11.5px;margin-top:6px;border-collapse:collapse}
+.pop td{padding:2px 10px 2px 0;color:var(--muted)}
+.pop td+td{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+#tip{position:fixed;z-index:2600;pointer-events:none;opacity:0;transform:translate(-50%,-100%);background:var(--green-950);color:#fff;font-size:11px;font-weight:600;padding:7px 10px;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.28);max-width:250px;transition:opacity .1s ease}
+#tip .tt{font-size:11.5px;font-weight:800;margin-bottom:4px}
+#tip .tr{display:flex;justify-content:space-between;gap:14px;color:#bcd6c5;font-weight:500;font-variant-numeric:tabular-nums}
+#tip .tr b{color:#fff;font-weight:700}
+.toast{position:fixed;bottom:48px;left:50%;transform:translateX(-50%);z-index:3000;background:var(--green-900);color:#fff;font-size:12.5px;font-weight:600;padding:9px 18px;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.3);max-width:min(520px,90vw);text-align:center;line-height:1.4;opacity:0;pointer-events:none;transition:opacity .18s ease}
+.toast.show{opacity:1}
+
+/* ── Responsive (styles.css § Responsive) ── */
+@media (max-width:1100px){
+  body{overflow:auto}
+  .app{flex-direction:column;height:auto}
+  .side,.results{width:100%;border:0;border-bottom:1px solid var(--line)}
+  .mapwrap{height:58vh;min-height:380px;flex:none}
+  .hdr{height:auto;flex-wrap:wrap;padding:10px 16px;gap:10px}
+  .hdr nav{margin-left:0;flex-wrap:wrap}
+  .hdr .right{margin-left:0}
+  .ftr{height:auto;flex-wrap:wrap;gap:8px 12px;padding:10px 16px;line-height:1.5;white-space:normal}
+  .ftr .dot{display:none}
+  .side .foot{margin-top:0}
+}
+/* ── Small screens ──────────────────────────────────────────────────────────
+   The map overlays are separate absolutely-positioned islands, so below the
+   width where they would collide they move apart instead of shrinking into
+   illegibility: search spans the top, basemap drops to the bottom-left, and the
+   legend stays bottom-right. */
+@media (max-width:760px){
+  .mapsearch{left:58px;right:14px;width:auto}
+  .mapsearch input{font-size:16px;padding:9px 10px}   /* 16px stops iOS zooming on focus */
+  .mapctl{top:auto;bottom:14px;left:14px;right:auto}
+  .legend{width:172px;bottom:14px;padding:10px 12px}
+  .maptip{top:60px;font-size:12px;padding:7px 12px}
+  .mapnote{bottom:60px;max-width:calc(100% - 28px)}
+}
+@media (max-width:560px){
+  /* Zoom control and search no longer fit side by side. Search is the control
+     people reach for on a phone, so it takes the top line and Leaflet's zoom
+     buttons move below it rather than the other way round. */
+  .mapsearch{left:14px;right:14px;top:14px;width:auto}
+  .leaflet-top{top:52px}
+  .maptip{top:66px}
+  .legend{position:static;margin:10px 14px 14px;width:auto;box-shadow:none}
+  .mapwrap{display:flex;flex-direction:column}
+  #map{position:relative;flex:1;min-height:300px}
+  .mapctl{position:static;align-self:flex-start;margin:0 14px 10px}
+  .mapnote{position:static;margin:0 14px 12px;max-width:none}
+  .hdr .brand .t2{font-size:10.5px}
+  .kpis{grid-template-columns:1fr}
+  .kpi.hero .v{font-size:30px}
+}
+@media (prefers-reduced-motion:reduce){ *{transition:none !important;animation:none !important} }
+</style>
+
+<header class="hdr">
+  <div class="brand">
+    <div class="mark" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <path d="M12 21V9" stroke="#f3e5c3" stroke-width="1.6" stroke-linecap="round"></path>
+        <path d="M12 9c0-3 2-5 5-5 0 3-2 5-5 5Zm0 4c0-3 2-5 5-5 0 3-2 5-5 5Zm0 4c0-3 2-5 5-5 0 3-2 5-5 5Zm0-8c0-3-2-5-5-5 0 3 2 5 5 5Zm0 4c0-3-2-5-5-5 0 3 2 5 5 5Zm0 4c0-3-2-5-5-5 0 3 2 5 5 5Z" fill="#e8c877"></path>
+      </svg>
+    </div>
+    <div>
+      <div class="t1">Wheat Water Productivity</div>
+      <div class="t2">Ethiopian Institute of Agricultural Research</div>
+    </div>
+  </div>
+  <nav aria-label="Dashboard sections">
+    <button class="on" id="nav-dash">Dashboard</button>
+    <button data-modal="about">Method &amp; data</button>
+    <button data-modal="help">Help</button>
+  </nav>
+  <div class="right"><span class="chip" id="seasonChip"></span></div>
+</header>
+
+<div class="app">
+  <!-- ───────── Sidebar ───────── -->
+  <aside class="side" aria-label="Season and fields">
+    <div class="sec">
+      <h3>Add area of interest</h3>
+      <div class="seg" role="group" aria-label="Geometry type">
+        <button id="seg-point" class="on">Point</button>
+        <button id="seg-poly">Polygon</button>
+      </div>
+      <button class="drawbtn" id="drawbtn"></button>
+      <div id="drawpanel"></div>
+      <button class="upload" id="uploadbtn">Upload GeoJSON, zipped Shapefile, or select .shp <b>and</b> .dbf together for names &amp; IDs</button>
+      <input id="aoiFile" type="file" multiple accept=".geojson,.json,.shp,.dbf,.shx,.prj,.cpg,.zip" hidden>
+      <details class="disclose">
+        <summary>Templates &amp; upload rules</summary>
+        <div class="ds">
+          <button class="linkbtn" data-tpl="poly">Irrigated_Wheat_2026</button>
+          <span class="meta">2 field boundaries</span>
+          <span class="note">Two plots from the real survey layer, with their own
+            seasons.</span>
+        </div>
+        <div class="ds">
+          <button class="linkbtn" data-tpl="pnt">Irrigated_Wheat_2026_PNT</button>
+          <span class="meta">2 monitoring points</span>
+          <span class="note">Two samples sharing a plot, showing how <code>Location</code>
+            groups them.</span>
+        </div>
+        <p class="src">Real features from the 2026 layers, as GeoJSON. Upload one back
+          unchanged to see the workflow end to end, or keep the property names and swap in
+          your own geometry and values. Working in QGIS? The same columns live in the
+          <code>.dbf</code> &mdash; zip the shapefile so they travel with it.</p>
+        <p class="src">Draw the geometry first &mdash; the attributes dialog opens when it is
+          complete. ID must be a unique positive integer (pre-filled, auto-increments) and Plot
+          name is required. SOS/EOS (EOS after SOS) and plot number for points are validated
+          before the feature is added.</p>
+        <p class="src">A polygon must cover at least <b>1&nbsp;ha</b> &mdash; one WaPOR pixel at
+          100&nbsp;m &mdash; and span no more than 3&deg;&nbsp;&times;&nbsp;3&deg;. Anything under
+          4&nbsp;ha is only a few pixels and says so when you add it.</p>
+      </details>
+      <p class="err" id="inputErr" role="alert" hidden></p>
+      <div class="clist" id="clist"></div>
+      <p class="hint" id="inputHint"></p>
+    </div>
+    <div class="sec">
+      <button class="runbtn" id="runbtn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
+        <span id="runLabel">Run analysis</span>
+      </button>
+      <button class="resetbtn" id="resetbtn">Reset &mdash; clear plots &amp; results</button>
+      <p class="hint mid">Retrieves WaPOR L2 NPP &amp; AETI per feature (SOS &rarr; EOS) and computes yield and water productivity.</p>
+    </div>
+    <div class="foot">
+      Wheat Water Productivity Tool (WWPT) &middot; developed by IWMI East Africa with EIAR under
+      WaPOR Phase II, supported by FAO and the Government of the Netherlands.
+    </div>
+  </aside>
+
+  <!-- ───────── Map ───────── -->
+  <main class="mapwrap" aria-label="Map">
+    <div id="map"></div>
+    <form class="mapsearch" id="mapsearch" role="search" aria-label="Find a place">
+      <input id="searchq" type="search" autocomplete="off"
+             placeholder="Find a place, or paste lat, lon"
+             aria-label="Place name or coordinates">
+      <button type="submit" id="searchgo" aria-label="Search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2"/>
+          <path d="M15.5 15.5L21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <ul id="searchresults" hidden></ul>
+    </form>
+    <div class="mapctl" id="mapctl" role="group" aria-label="Basemap">
+      <button id="bm-Streets" class="on" aria-pressed="true">Streets</button>
+      <button id="bm-Satellite" aria-pressed="false">Satellite</button>
+    </div>
+    <div class="maptip" id="maptip" hidden></div>
+    <div class="spin" id="spin" hidden role="status" aria-live="polite">
+      <div class="card">
+        <div class="bars" aria-hidden="true"><i></i><i></i><i></i></div>
+        <p>Processing features: <span id="progText"></span></p>
+        <div class="track"><i id="progBar" style="width:0%"></i></div>
+        <small id="progPost"></small>
+      </div>
+    </div>
+    <div class="legend" id="legend" hidden aria-label="Map legend">
+      <h4 id="lgTitle"></h4>
+      <div class="ramp" aria-hidden="true"></div>
+      <div class="ramplbl"><span id="lgMin"></span><span id="lgMax"></span></div>
+      <div class="rampu" id="lgUnit"></div>
+    </div>
+    <div class="mapnote" id="mapnote" hidden></div>
+  </main>
+
+  <!-- ───────── Results ───────── -->
+  <aside class="results" id="results" hidden aria-label="Results"></aside>
+</div>
+
+<footer class="ftr">
+  <span>&copy; 2026 Ethiopian Institute of Agricultural Research</span><span class="dot"></span>
+  <span>Data: FAO WaPOR v3</span><span class="dot"></span>
+  <span>etwapor v1.0</span><span class="dot"></span>
+  <span>Yield &amp; WP computed with etwapor from WaPOR L2 NPP/AETI</span>
+  <span class="dot"></span>
+  <span id="providerNote">No server — start it to run the analysis</span>
+</footer>
+
+<!-- ───────── Plot attributes ───────── -->
+<div class="modal sm" id="m-manual" hidden role="dialog" aria-modal="true" aria-label="Create plot manually">
+  <div class="box">
+    <div class="mh">
+      <div><h2>Plot attributes</h2><div class="sub" id="pendingSummary"></div></div>
+      <button data-close aria-label="Close">&#10005;</button>
+    </div>
+    <div class="mb" style="padding:16px 20px 18px">
+      <div class="grid2">
+        <div><label for="inpId">ID</label><input id="inpId" type="number" min="1" step="1"></div>
+        <div><label for="inpName">Plot name</label><input id="inpName" type="text" placeholder="e.g. Koga block 3"></div>
+      </div>
+      <div class="grid11">
+        <div><label for="inpSos">SOS</label><input id="inpSos" type="date"></div>
+        <div><label for="inpEos">EOS</label><input id="inpEos" type="date"></div>
+      </div>
+      <div id="locFld" style="margin-bottom:10px">
+        <label for="inpLoc">Location (plot number)</label>
+        <input id="inpLoc" type="number" min="1" step="1">
+      </div>
+      <p class="err" id="manualErr" role="alert" hidden></p>
+      <div class="mrow">
+        <button class="discard" data-close>Discard</button>
+        <button class="add" id="commitPending">Add plot</button>
+      </div>
+      <p class="hint" id="manualHint"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ───────── Method &amp; data ───────── -->
+<div class="modal" id="m-about" hidden role="dialog" aria-modal="true" aria-label="Method and data">
+  <div class="box">
+    <div class="mh"><h2>Method &amp; data</h2><button data-close aria-label="Close">&#10005;</button></div>
+    <div class="mb">
+      <h4>Estimation approach</h4>
+      <p>Seasonal WaPOR NPP (L2, 100&nbsp;m, dekadal, summed SOS &rarr; EOS) is linked to biomass,
+        yield and water use in a simple sequence:</p>
+      <div class="eqbox">
+        TB&nbsp;&nbsp;= (AOT &times; fc &times; NPP &times; 22.222) / (1 &minus; mc)<br>
+        Y&nbsp;&nbsp;&nbsp;= TB &times; hi<br>
+        CWP = Y / SWC
+      </div>
+      <p>where TB is total biomass (kg/ha), NPP the seasonal net primary production
+        (gC/m&sup2;/season), Y the yield (kg/ha), CWP the crop water productivity (kg/m&sup3;) and
+        SWC the seasonal water consumption (m&sup3;, from WaPOR AETI). Yield measures how
+        efficiently land produces wheat; CWP measures how efficiently the consumed water is
+        converted into production &mdash; together they support evaluating irrigation
+        performance.</p>
+      <h4>Crop parameter assumptions</h4>
+      <p>The wheat parameters &mdash; AOT = 0.85 (above-ground/total biomass), fc = 0.90
+        (light-use correction), mc = 0.15 (grain moisture), hi = 0.48 (harvest index) &mdash; are
+        general FAO reference values. They are defaults: crop growth varies with agro-ecological
+        zone, climate, soils, variety and management, so locally developed EIAR parameters and
+        field observations should replace them where available to improve the accuracy and
+        credibility of the estimates.</p>
+      <h4>Input validation</h4>
+      <p>Before estimation, mandatory fields are checked: <b>ID</b> (unique integer), <b>SOS</b>
+        and <b>EOS</b> (valid dates, EOS after SOS), <b>geometry</b> (valid point or polygon in
+        WGS&nbsp;84), and <b>Location</b> for point features, which links samples to individual
+        plots. Records failing a check are flagged and must be corrected before analysis.</p>
+      <h4>Boundaries and points</h4>
+      <p>Field boundaries and monitoring points are the 2026 irrigated wheat survey layers
+        (Amibara, Dubti, Dodota, Godino). Field metrics are the seasonal WaPOR v3 results; point
+        results are aggregated to farm plots by median, following the analysis notebook. Custom
+        areas added on the map get illustrative estimates until a WaPOR run covers them.</p>
+      <h4>Caveats in the 2026 survey data</h4>
+      <p><b>Dubti field 4</b> contains no monitoring points, so nothing checks its estimate
+        &mdash; and its seasonal AETI of 194&nbsp;mm is a third below its two neighbours on the
+        same season window, consistent with part of the mapped area not having been cropped.
+        <b>Dodota</b> mixes seasons: its boundary record runs
+        Dec&nbsp;2024&nbsp;&rarr;&nbsp;Apr&nbsp;2025 while one of its two point groups was
+        collected a year later, so a boundary-versus-point comparison there is partly a comparison
+        between years.</p>
+      <p>At 100&nbsp;m one WaPOR pixel is one hectare, so Godino covers about 4&nbsp;pixels,
+        Dodota 7 and Amibara 13. Field outlines are finer than the data can resolve, and a
+        whole-field average at that ratio is dominated by edge pixels.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ───────── Help ───────── -->
+<div class="modal wide" id="m-help" hidden role="dialog" aria-modal="true" aria-label="Help">
+  <div class="box">
+    <div class="mh">
+      <div>
+        <h2>Help &mdash; using the Wheat Water Productivity Tool</h2>
+        <div class="sub">Define your areas of interest, run the WaPOR analysis, read and export the results</div>
+      </div>
+      <button data-close aria-label="Close help">&#10005;</button>
+    </div>
+    <div class="mb helpsec">
+      <section>
+        <h3>1 &middot; Workflow at a glance</h3>
+        <div class="cards3">
+          <div><div class="st">Step 1</div><div class="hd">Define your plots</div><p>Draw them manually or upload GeoJSON / .shp files.</p></div>
+          <div><div class="st">Step 2</div><div class="hd">Run analysis</div><p>Each feature is processed for its own season window.</p></div>
+          <div><div class="st">Step 3</div><div class="hd">Read &amp; export</div><p>Inspect per-plot results, then export to CSV.</p></div>
+        </div>
+      </section>
+      <section>
+        <h3>2 &middot; Creating plots manually</h3>
+        <p>Choose <b>Point</b> or <b>Polygon</b> in the left panel and press the draw button &mdash;
+          you draw the geometry first, then fill in its attributes.</p>
+        <ul>
+          <li><b>Point</b> &mdash; one click on the map places the plot.</li>
+          <li><b>Polygon</b> &mdash; click to add vertices (minimum three), then press
+            <b>Finish polygon</b>. <b>Esc</b> cancels at any time.</li>
+          <li>As soon as the geometry is complete the <b>Plot attributes</b> dialog opens: enter
+            ID, plot name, season dates and (for points) the plot number, then press
+            <b>Add plot</b>. <b>Discard</b> throws the geometry away.</li>
+        </ul>
+      </section>
+      <section>
+        <h3>3 &middot; Attributes and validation</h3>
+        <p>Every plot must carry the attributes the model needs. Features are rejected with a
+          message in the panel until all rules pass.</p>
+        <table class="atable">
+          <thead><tr><th>Attribute</th><th>Rule</th></tr></thead>
+          <tbody>
+            <tr><td>ID</td><td>Positive integer, unique across your plots. Auto-increments after each add.</td></tr>
+            <tr><td>Name</td><td>Required. The plot label used in lists, popups and exports.</td></tr>
+            <tr><td>SOS / EOS</td><td>Both required; EOS must fall after SOS. Defines the season the WaPOR data is summed over.</td></tr>
+            <tr><td>Location</td><td>Points only &mdash; the plot number recorded in the field.</td></tr>
+            <tr><td>Geometry</td><td>Polygons need at least three vertices; coordinates must be geographic (EPSG:4326).</td></tr>
+          </tbody>
+        </table>
+      </section>
+      <section>
+        <h3>4 &middot; Uploading existing plots</h3>
+        <p>Use <b>Upload GeoJSON or Shapefile</b> for plots you already have. Accepted geometries:
+          Point, MultiPoint, Polygon, MultiPolygon &mdash; multi-part features are split into
+          individual plots.</p>
+        <ul>
+          <li>Coordinates must be longitude/latitude in <b>EPSG:4326</b>; projected files should be
+            reprojected first.</li>
+          <li>Plot names come from a <code>name</code>, <code>plot</code> or <code>field</code>
+            property in the GeoJSON, or from the <code>Name</code> column of a shapefile&rsquo;s
+            <code>.dbf</code>. Without either, plots are numbered by position
+            (<code>Plot 1</code>, <code>Plot 2</code>, &hellip;) &mdash; naming them after the
+            file would give every feature in one upload the same label.</li>
+          <li>For shapefiles, select the <code>.shp</code> and its <code>.dbf</code> together
+            &mdash; Name, ID, Location and SOS/EOS columns are then read from the attribute
+            table. Without the <code>.dbf</code> only geometry is imported and the form&rsquo;s
+            dates apply.</li>
+          <li>Unsupported geometries (lines, empty features) are skipped and counted in the
+            message.</li>
+        </ul>
+      </section>
+      <section>
+        <h3>5 &middot; Running the analysis</h3>
+        <p>Press <b>Run analysis</b>. Features are processed one by one &mdash; the progress card
+          reports the count and each feature&rsquo;s ID, yield and CWP as it completes, then the
+          map, KPI cards and legend switch to results.</p>
+        <p>Add or remove plots and press <b>Re-run analysis</b> to refresh. Results always reflect
+          the plots currently in the panel.</p>
+      </section>
+      <section>
+        <h3>6 &middot; Reading the results</h3>
+        <div class="cards2">
+          <div><b>WP (kg/m&sup3;)</b><p>Crop water productivity &mdash; grain yield per cubic metre of water consumed.</p></div>
+          <div><b>Yield (t/ha)</b><p>Grain yield from seasonal NPP via the etwapor biomass model.</p></div>
+          <div><b>AETI (mm)</b><p>Actual evapotranspiration and interception summed over the season.</p></div>
+          <div><b>NPP &middot; LGP</b><p>Seasonal net primary production, and length of growing period in days.</p></div>
+        </div>
+        <p style="margin-top:8px">The map colours plots along the legend ramp &mdash; darker greens
+          are higher values. The map is coloured by water productivity; switch the basemap with the
+          control at the top right. Click any plot on the map or in the list to open its detail.</p>
+      </section>
+      <section>
+        <h3>7 &middot; Exporting</h3>
+        <p>Use <b>Compare with field data</b> to type measured yield and water productivity per
+          plot. Differences are shown per plot (green within 10%, amber to 25%, red beyond), with
+          the number of pairs, the mean bias and the RMSE across them.</p>
+        <p>After a run, <b>Export results (CSV)</b> writes one row per plot with its attributes and
+          all computed metrics &mdash; ready for further analysis or reporting.</p>
+      </section>
+      <section>
+        <h3>8 &middot; Troubleshooting</h3>
+        <ul>
+          <li><b>Nothing appears after a click</b> &mdash; the draw button must be active; check the panel message for a validation error.</li>
+          <li><b>&ldquo;ID already used&rdquo;</b> &mdash; raise the ID; each plot needs its own.</li>
+          <li><b>Upload adds nothing</b> &mdash; the file has no supported geometry, or coordinates are projected rather than lon/lat.</li>
+          <li><b>Plots are grey and no legend shows</b> &mdash; the analysis has not been run yet.</li>
+        </ul>
+      </section>
+      <p class="mfoot">The 2026 survey fields and monitoring points carry real
+        <code>etwapor</code> results and can be opened at any time. Areas you add yourself get
+        illustrative estimates, labelled as such, until the tool is connected to a live WaPOR
+        retrieval. See <b>Method &amp; data</b> for the equations and the caveats.</p>
+    </div>
+  </div>
+</div>
+
+<div id="tip" role="status" aria-live="polite"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script id="payload" type="application/json">{"plots":[{"id":1,"name":"Amibara","scheme":"AF001","area_ha":12.6196,"sos":"2025-11-22","eos":"2026-02-20","NPP":184.95,"EYield_tpha":1.78,"AETI_mm":297.32,"WP_kgpm3":0.6,"LGP":90,"prod_t":22.46,"water_m3":37521.0,"ring_m":[[-265.08,58.61],[-109.52,244.84],[-103.56,251.98],[89.23,76.64],[241.15,-61.22],[257.05,-75.64],[81.07,-273.35],[74.73,-280.47],[-265.08,58.61]],"lat0":9.344,"lon0":40.17162,"ext_m":[522,532],"pts_m":[[74.39,-185.81,1],[77.8,-85.85,1],[-30.5,-82.4,1],[-26.99,30.93,1],[-124.31,29.59,1]],"ring_deg":[[[40.16921,9.344526],[40.170627,9.346199],[40.170681,9.346263],[40.172436,9.344688],[40.173819,9.343449],[40.173964,9.34332],[40.172362,9.341544],[40.172304,9.34148],[40.16921,9.344526]]]},{"id":2,"name":"Dubti","scheme":"AF002","area_ha":50.9921,"sos":"2025-11-20","eos":"2026-03-16","NPP":168.7,"EYield_tpha":1.62,"AETI_mm":319.43,"WP_kgpm3":0.51,"LGP":116,"prod_t":82.61,"water_m3":162884.0,"ring_m":[[141.98,-425.03],[-354.66,-347.32],[-214.34,719.35],[285.04,478.03],[141.98,-425.03]],"lat0":11.74147,"lon0":41.11753,"ext_m":[640,1144],"pts_m":[[1.44,-293.94,1],[-86.3,-188.52,1],[-189.51,-296.73,1],[19.75,26.21,1],[-109.18,27.99,1],[-112.78,139.09,1],[15.17,141.87,1],[122.09,139.09,1],[-205.97,24.32,1],[-96.32,-82.1,1],[17.9,-80.21,1],[23.35,243.62,1],[-83.57,245.51,1],[-199.65,242.73,1],[-200.52,-194.09,1],[-202.37,-82.1,1],[-97.3,349.04,1],[-91.75,462.92,1],[16.05,351.93,1],[120.24,24.32,1],[115.66,354.72,1],[-403.78,136.53,0]],"ring_deg":[[[41.118828,11.73765],[41.114272,11.738349],[41.115559,11.747931],[41.120141,11.745763],[41.118828,11.73765]]]},{"id":3,"name":"Dubti","scheme":"AF002","area_ha":57.014,"sos":"2025-11-20","eos":"2026-03-16","NPP":138.29,"EYield_tpha":1.33,"AETI_mm":291.45,"WP_kgpm3":0.46,"LGP":116,"prod_t":75.83,"water_m3":166167.0,"ring_m":[[184.81,-419.71],[-377.53,-348.16],[-282.3,746.29],[290.2,441.29],[184.81,-419.71]],"lat0":11.74216,"lon0":41.11239,"ext_m":[668,1166],"pts_m":[[66.16,-264.2,1],[-184.19,-265.54,1],[-50.13,-159.67,1],[152.04,-49.91,1],[-62.77,74.1,1],[-62.77,155.36,1],[-70.4,275.47,1],[-172.75,269.02,1],[-176.56,160.59,1],[-57.76,-58.93,1],[155.86,59.85,1],[-62.77,-266.76,1],[-177.87,-155.78,1],[40.88,50.83,1],[45.89,-53.81,1],[-174.05,-47.35,1],[-180.37,67.64,1]],"ring_deg":[[[41.114087,11.738387],[41.108927,11.73903],[41.109801,11.748861],[41.115054,11.746122],[41.114087,11.738387]]]},{"id":4,"name":"Dubti","scheme":"AF002","area_ha":46.6393,"sos":"2025-11-20","eos":"2026-03-16","NPP":65.24,"EYield_tpha":0.63,"AETI_mm":193.81,"WP_kgpm3":0.32,"LGP":116,"prod_t":29.38,"water_m3":90392.0,"ring_m":[[160.79,-426.07],[-323.17,-337.49],[-231.01,630.9],[232.59,558.73],[160.79,-426.07]],"lat0":11.74294,"lon0":41.10727,"ext_m":[556,1057],"pts_m":[],"ring_deg":[[[41.108748,11.739116],[41.104308,11.739912],[41.105153,11.748611],[41.109407,11.747962],[41.108748,11.739116]]]},{"id":5,"name":"Dodota","scheme":"OR001","area_ha":7.37353,"sos":"2024-12-02","eos":"2025-04-02","NPP":478.22,"EYield_tpha":4.59,"AETI_mm":369.28,"WP_kgpm3":1.24,"LGP":121,"prod_t":33.84,"water_m3":27229.0,"ring_m":[[63.18,143.81],[173.89,75.4],[159.22,23.17],[106.2,49.12],[77.93,2.87],[74.95,-2.29],[78.49,-4.83],[136.65,-46.36],[118.82,-111.41],[84.69,-242.28],[27.59,-210.72],[11.02,-246.2],[-225.5,-121.6],[-193.71,-59.68],[-165.01,-75.36],[-146.46,-34.04],[-168.89,-13.45],[-92.89,110.37],[-77.38,107.24],[-72.3,117.29],[-28.52,203.8],[-5.18,191.33],[63.18,143.81]],"lat0":8.29311,"lon0":39.38339,"ext_m":[399,450],"pts_m":[[-3.48,-70.92,1],[-115.07,-70.03,1],[-7.89,-180.57,1],[92.68,-175.67,1],[-14.06,37.39,1],[-15.38,146.6,1],[92.68,-175.67,1],[-7.89,-180.57,1],[-3.48,-70.92,1],[-115.07,-70.03,1],[-14.06,37.39,1],[-15.38,146.6,1]],"ring_deg":[[[39.383965,8.294403],[39.38497,8.293788],[39.384837,8.293319],[39.384356,8.293552],[39.384099,8.293137],[39.384072,8.293091],[39.384104,8.293068],[39.384632,8.292695],[39.38447,8.29211],[39.384161,8.290935],[39.383642,8.291218],[39.383492,8.290899],[39.381345,8.292019],[39.381633,8.292575],[39.381894,8.292434],[39.382062,8.292805],[39.381858,8.29299],[39.382548,8.294103],[39.382689,8.294074],[39.382735,8.294165],[39.383133,8.294942],[39.383345,8.29483],[39.383965,8.294403]]]},{"id":6,"name":"Godino","scheme":"OR002","area_ha":4.32878,"sos":"2025-12-07","eos":"2026-03-13","NPP":319.52,"EYield_tpha":3.07,"AETI_mm":219.53,"WP_kgpm3":1.4,"LGP":96,"prod_t":13.29,"water_m3":9503.0,"ring_m":[[-37.99,-97.74],[-33.3,-146.61],[-114.41,-154.42],[-112.21,-92.72],[-107.68,-49.57],[-109.93,-41.6],[-114.95,-23.84],[-120.14,6.62],[-131.03,42.33],[-136.74,63.34],[-130.99,69.47],[-120.55,80.59],[-107.16,94.85],[-90.04,91.17],[-58.39,88.55],[-45.44,96.88],[-13.16,97.71],[16.64,96.6],[22.16,88.78],[23.26,62.25],[20.07,51.42],[17.74,36.36],[24.72,30.82],[143.95,51.66],[148.6,47.29],[152.59,35.86],[151.92,18.05],[148.6,7.97],[137.31,-1.11],[119.04,-7.49],[95.46,-13.21],[91.04,-13.94],[88.93,-47.48],[104.93,-88.53],[66.85,-98.3],[27.12,-105.84],[22.43,-87.13],[-1.29,-91.32],[-37.99,-97.74]],"lat0":8.84859,"lon0":39.02266,"ext_m":[289,252],"pts_m":[[-77.75,-51.28,1],[25.54,-45.5,1]],"ring_deg":[[[39.022313,8.847716],[39.022356,8.847277],[39.021619,8.847206],[39.021639,8.847761],[39.02168,8.848148],[39.021659,8.84822],[39.021614,8.84838],[39.021567,8.848653],[39.021468,8.848974],[39.021416,8.849163],[39.021468,8.849218],[39.021563,8.849318],[39.021685,8.849446],[39.02184,8.849413],[39.022128,8.849389],[39.022246,8.849464],[39.022539,8.849471],[39.02281,8.849461],[39.02286,8.849391],[39.02287,8.849153],[39.022841,8.849056],[39.02282,8.84892],[39.022884,8.848871],[39.023968,8.849058],[39.02401,8.849019],[39.024046,8.848916],[39.02404,8.848756],[39.02401,8.848665],[39.023907,8.848584],[39.023741,8.848526],[39.023527,8.848475],[39.023487,8.848468],[39.023467,8.848167],[39.023613,8.847798],[39.023267,8.847711],[39.022905,8.847643],[39.022863,8.847811],[39.022647,8.847773],[39.022313,8.847716]]]}],"pointAgg":[{"name":"Amibara","loc":1,"scheme":"AF001","lgp":90,"sos":"2025-11-22","eos":"2026-02-20","NPP":206.91,"AETI_mm":319.0,"EYield_tpha":1.99,"WP_kgpm3":0.62,"n":5},{"name":"Dodota","loc":4,"scheme":"OR001","lgp":111,"sos":"2025-12-11","eos":"2026-04-01","NPP":556.48,"AETI_mm":378.4,"EYield_tpha":5.34,"WP_kgpm3":1.4,"n":6},{"name":"Dodota","loc":6,"scheme":"OR001","lgp":102,"sos":"2024-12-21","eos":"2025-04-02","NPP":467.68,"AETI_mm":358.85,"EYield_tpha":4.49,"WP_kgpm3":1.24,"n":6},{"name":"Dubti","loc":2,"scheme":"AF002","lgp":116,"sos":"2025-11-20","eos":"2026-03-16","NPP":197.57,"AETI_mm":329.9,"EYield_tpha":1.9,"WP_kgpm3":0.59,"n":21},{"name":"Dubti","loc":3,"scheme":"AF002","lgp":116,"sos":"2025-11-20","eos":"2026-03-16","NPP":146.32,"AETI_mm":322.5,"EYield_tpha":1.4,"WP_kgpm3":0.36,"n":17},{"name":"Godino","loc":5,"scheme":"OR002","lgp":96,"sos":"2025-12-07","eos":"2026-03-13","NPP":425.89,"AETI_mm":280.2,"EYield_tpha":4.09,"WP_kgpm3":1.46,"n":2}],"points":[{"id":1,"name":"Amibara","loc":1,"scheme":"AF001","lon":40.172301,"lat":9.34233,"NPP":233.34,"EYield_tpha":2.24,"AETI_mm":346.7,"WP_kgpm3":0.65},{"id":2,"name":"Amibara","loc":1,"scheme":"AF001","lon":40.172332,"lat":9.343228,"NPP":215.32,"EYield_tpha":2.07,"AETI_mm":325.6,"WP_kgpm3":0.63},{"id":3,"name":"Amibara","loc":1,"scheme":"AF001","lon":40.171346,"lat":9.343259,"NPP":206.91,"EYield_tpha":1.99,"AETI_mm":319.0,"WP_kgpm3":0.62},{"id":4,"name":"Amibara","loc":1,"scheme":"AF001","lon":40.171378,"lat":9.344277,"NPP":196.37,"EYield_tpha":1.89,"AETI_mm":311.1,"WP_kgpm3":0.61},{"id":5,"name":"Amibara","loc":1,"scheme":"AF001","lon":40.170492,"lat":9.344265,"NPP":185.43,"EYield_tpha":1.78,"AETI_mm":297.6,"WP_kgpm3":0.6},{"id":6,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.117539,"lat":11.738828,"NPP":293.53,"EYield_tpha":2.82,"AETI_mm":455.2,"WP_kgpm3":0.62},{"id":7,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.116734,"lat":11.739775,"NPP":291.49,"EYield_tpha":2.8,"AETI_mm":444.5,"WP_kgpm3":0.63},{"id":8,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.115787,"lat":11.738803,"NPP":286.75,"EYield_tpha":2.75,"AETI_mm":435.9,"WP_kgpm3":0.63},{"id":9,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.117707,"lat":11.741704,"NPP":226.5,"EYield_tpha":2.17,"AETI_mm":344.1,"WP_kgpm3":0.63},{"id":10,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.116524,"lat":11.74172,"NPP":215.36,"EYield_tpha":2.07,"AETI_mm":329.9,"WP_kgpm3":0.63},{"id":11,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.116491,"lat":11.742718},{"id":12,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.117665,"lat":11.742743},{"id":13,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.118646,"lat":11.742718},{"id":14,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.115636,"lat":11.741687},{"id":15,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.116642,"lat":11.740731},{"id":16,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.11769,"lat":11.740748},{"id":17,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.11774,"lat":11.743657},{"id":18,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.116759,"lat":11.743674},{"id":19,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.115694,"lat":11.743649},{"id":20,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.115686,"lat":11.739725},{"id":21,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.115669,"lat":11.740731},{"id":22,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.116633,"lat":11.744604},{"id":23,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.116684,"lat":11.745627},{"id":24,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.117673,"lat":11.74463},{"id":25,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.118629,"lat":11.741687},{"id":26,"name":"Dubti","loc":2,"scheme":"AF002","lon":41.118587,"lat":11.744655},{"id":27,"name":"Dubti","loc":3,"scheme":"AF002","lon":41.112998,"lat":11.739784},{"id":28,"name":"Dubti","loc":3,"scheme":"AF002","lon":41.110701,"lat":11.739772},{"id":29,"name":"Dubti","loc":3,"scheme":"AF002","lon":41.111931,"lat":11.740723},{"id":30,"name":"Dubti","loc":3,"scheme":"AF002","lon":41.113786,"lat":11.741709},{"id":31,"name":"Dubti","loc":3,"scheme":"AF002","lon":41.111815,"lat":11.742823},{"id":32,"name":"Dubti","loc":3,"scheme":"AF002","lon":41.111815,"lat":11.743553},{"id":33,"name":"Dubti","loc":3,"scheme":"AF002","lon":41.111745,"lat":11.744632},{"id":34,"name":"Dubti","loc":3,"scheme":"AF002","lon":41.110806,"lat":11.744574},{"id":35,"name":"Dubti","loc":3,"scheme":"AF002","lon":41.110771,"lat":11.7436},{"id":36,"name":"Dubti","loc":3,"scheme":"AF002","lon":41.111861,"lat":11.741628},{"id":37,"name":"Dubti","loc":3,"scheme":"AF002","lon":41.113821,"lat":11.742695},{"id":38,"name":"Dubti","loc":3,"scheme":"AF002","lon":41.111815,"lat":11.739761},{"id":39,"name":"Dubti","loc":3,"scheme":"AF002","lon":41.110759,"lat":11.740758},{"id":40,"name":"Dubti","loc":3,"scheme":"AF002","lon":41.112766,"lat":11.742614},{"id":41,"name":"Dubti","loc":3,"scheme":"AF002","lon":41.112812,"lat":11.741674},{"id":42,"name":"Dubti","loc":3,"scheme":"AF002","lon":41.110794,"lat":11.741732},{"id":43,"name":"Dubti","loc":3,"scheme":"AF002","lon":41.110736,"lat":11.742765},{"id":44,"name":"Dodota","loc":4,"scheme":"OR001","lon":39.38336,"lat":8.292474},{"id":45,"name":"Dodota","loc":4,"scheme":"OR001","lon":39.382347,"lat":8.292482},{"id":46,"name":"Dodota","loc":4,"scheme":"OR001","lon":39.38332,"lat":8.291489},{"id":47,"name":"Dodota","loc":4,"scheme":"OR001","lon":39.384233,"lat":8.291533},{"id":48,"name":"Dodota","loc":4,"scheme":"OR001","lon":39.383264,"lat":8.293447},{"id":49,"name":"Dodota","loc":4,"scheme":"OR001","lon":39.383252,"lat":8.294428},{"id":50,"name":"Godino","loc":5,"scheme":"OR002","lon":39.021952,"lat":8.848133},{"id":51,"name":"Godino","loc":5,"scheme":"OR002","lon":39.022891,"lat":8.848185},{"id":52,"name":"Dodota","loc":6,"scheme":"OR001","lon":39.384233,"lat":8.291533},{"id":53,"name":"Dodota","loc":6,"scheme":"OR001","lon":39.38332,"lat":8.291489},{"id":54,"name":"Dodota","loc":6,"scheme":"OR001","lon":39.38336,"lat":8.292474},{"id":55,"name":"Dodota","loc":6,"scheme":"OR001","lon":39.382347,"lat":8.292482},{"id":56,"name":"Dodota","loc":6,"scheme":"OR001","lon":39.383264,"lat":8.293447},{"id":57,"name":"Dodota","loc":6,"scheme":"OR001","lon":39.383252,"lat":8.294428}],"compare":[{"scheme":"AF001","name":"Amibara","nplots":1,"area_ha":12.62,"bnd_yield":1.78,"bnd_wp":0.6,"bnd_aeti":297.3,"ngroups":1,"nsamples":5,"pnt_yield":1.99,"pnt_wp":0.62,"pnt_aeti":319.0},{"scheme":"AF002","name":"Dubti","nplots":3,"area_ha":154.65,"bnd_yield":1.21,"bnd_wp":0.43,"bnd_aeti":271.2,"ngroups":2,"nsamples":38,"pnt_yield":1.65,"pnt_wp":0.47,"pnt_aeti":326.2},{"scheme":"OR001","name":"Dodota","nplots":1,"area_ha":7.37,"bnd_yield":4.59,"bnd_wp":1.24,"bnd_aeti":369.3,"ngroups":2,"nsamples":12,"pnt_yield":4.92,"pnt_wp":1.32,"pnt_aeti":368.6},{"scheme":"OR002","name":"Godino","nplots":1,"area_ha":4.33,"bnd_yield":3.07,"bnd_wp":1.4,"bnd_aeti":219.5,"ngroups":1,"nsamples":2,"pnt_yield":4.09,"pnt_wp":1.46,"pnt_aeti":280.2}],"totals":{"area_ha":178.97,"prod_t":257.4,"water_m3":493696.0,"water_Mm3":0.494,"wtd_yield":1.44,"overall_wp":0.52,"wtd_aeti":276.0,"nplots":6,"nschemes":4,"npoints":57},"crop":{"AOT":0.85,"fc":0.9,"mc":0.15,"hi":0.48}}</script>
+<script>
+(function(){
+"use strict";
+const P = JSON.parse(document.getElementById("payload").textContent);
+const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+/* A metric is null until the model returns it, so every readout goes through here. */
+const fmt = (v, d = 2) => (v == null || !isFinite(v)) ? "—" : Number(v).toFixed(d);
+const $ = id => document.getElementById(id);
+const HAS_L = typeof window.L !== "undefined" && !!window.L.map;
+
+/* ── canvas constants ── */
+const RAMP = ["#93bd82","#6ba763","#458b4b","#297038","#0f4d26"];
+/* The canvas WP bar ramp is blue; its two lightest steps are re-stepped here so the light
+   end clears the 2:1 contrast floor on the white chart box (the canvas original starts at
+   #d6e5f2, which measures 1.28:1 and is effectively invisible). */
+const WP_RAMP = ["#93b9d7","#6fa3c8","#5590bc","#3f7cab","#1d5c8a"];
+const METRICS = {
+  WP_kgpm3:    { label:"Water productivity", unit:"kg/m³", fmt:v => v.toFixed(2) },
+  EYield_tpha: { label:"Estimated yield",    unit:"t/ha",  fmt:v => v.toFixed(2) },
+  AETI_mm:     { label:"Seasonal AETI",      unit:"mm",    fmt:v => String(Math.round(v)) }
+};
+
+/* ── survey layers: the 2026 fields, and points carrying their group median ── */
+const FIELDS = P.plots.map(f => Object.assign({}, f, {
+  nInside:(f.pts_m||[]).filter(q => q[2] === 1).length
+}));
+const nc = {};
+FIELDS.forEach(f => nc[f.name] = (nc[f.name]||0)+1);
+FIELDS.forEach(f => f.label = nc[f.name] > 1 ? f.name+" "+f.id : f.name);
+const GROUPS = {};
+P.pointAgg.forEach(g => GROUPS[g.name+"|"+g.loc] = g);
+const POINTS = P.points.map(p => {
+  const g = GROUPS[p.name+"|"+p.loc];
+  return Object.assign({}, p, { g:g, mv:{ WP_kgpm3:g.WP_kgpm3, EYield_tpha:g.EYield_tpha, AETI_mm:g.AETI_mm } });
+});
+
+/* ── state, as the canvas holds it ── */
+/* The server, when there is one. Same origin by default; ?api=<base> points the
+   page at a server on another port (Live Server on 5500 + uvicorn on 8000, say).
+   Absent, the page still works and says so — estimates are then in-page only. */
+const API = (() => {
+  try{
+    const q = new URLSearchParams(location.search).get("api");
+    if(q) return q.replace(/\/$/, "")+"/api/";
+    return new URL("api/", location.href).href;
+  }catch(e){
+    /* opaque origin (about:blank, some sandboxes) — a relative base still
+       resolves through fetch, and this must never throw at load time */
+    return "api/";
+  }
+})();
+let SERVER = null;
+
+const S = {
+  sel:null, inputMode:"point", drawing:false, drawPts:[], customs:[],
+  sos:"2025-11-20", eos:"2026-03-15", loc:"1", idVal:"1", nameVal:"",
+  manualOpen:false, pending:null, obs:{}, inputErr:null, run:"idle", prog:0, progPost:"",
+  metric:"WP_kgpm3",   /* fixed: water productivity, the canvas default */
+  basemap:"Streets", validationOpen:false
+};
+let cid = 0, runTimer = null, runTotal = 0;
+
+const mean = a => a.reduce((s,v) => s+v, 0) / (a.length || 1);
+const median = a => { const s = a.slice().sort((x,y) => x-y), m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m-1]+s[m])/2; };
+function fmtDate(s){
+  if(!s) return "—";
+  return new Date(s+"T00:00:00").toLocaleDateString("en-GB",{ day:"numeric", month:"short", year:"numeric" });
+}
+function fmtMY(s){
+  return new Date(s+"T00:00:00").toLocaleDateString("en-GB",{ month:"short", year:"numeric" });
+}
+function extent(mk){
+  const vals = S.customs.length
+    ? S.customs.map(c => c[mk])
+    : FIELDS.map(f => f[mk]).concat(POINTS.map(p => p.mv[mk]));
+  return [Math.min.apply(null,vals), Math.max.apply(null,vals)];
+}
+function colorFor(v,min,max){
+  const t = (v-min)/((max-min)||1);
+  return RAMP[Math.max(0, Math.min(4, Math.floor(t*5)))];
+}
+function nice(m){
+  const st = [1,2,2.5,5,10], p = Math.pow(10, Math.floor(Math.log10(m/4 || 1)));
+  return (st.find(x => x*p >= m/4) || 10) * p;
+}
+function areaHa(poly){
+  let a = 0;
+  for(let i = 0, j = poly.length-1; i < poly.length; j = i++)
+    a += (poly[j][1]+poly[i][1]) * (poly[j][0]-poly[i][0]);
+  const k = 110.57;
+  /* Mean latitude, not poly[0]: taking the first vertex makes the answer depend
+     on where the ring starts, so a reversed ring reports a different area.
+     Kept identical to server/app.py areaHa(). */
+  const lat = poly.reduce((s,p) => s+p[0], 0)/poly.length;
+  return Math.abs(a/2) * k * k * Math.cos((lat*Math.PI)/180) * 100;
+}
+/* Area limits. WaPOR v3 L2 is a 100 m product, so one pixel is one hectare:
+   below that an "average" is a single pixel, and the polygon outline is finer
+   than the data can resolve. The upper bound is the documented extent limit —
+   a single analysis extent is capped at about 3 degrees square. */
+const MIN_AREA_HA = 1, WARN_AREA_HA = 4, MAX_SPAN_DEG = 3, MAX_AREA_HA = 1000000;
+function ringSpan(poly){
+  const lat = poly.map(p => p[0]), lon = poly.map(p => p[1]);
+  return [Math.max.apply(null,lon) - Math.min.apply(null,lon),
+          Math.max.apply(null,lat) - Math.min.apply(null,lat)];
+}
+/* Returns null when the area is usable, else a message. */
+function areaProblem(poly){
+  const a = areaHa(poly);
+  if(!(a > 0)) return "Validation: polygon geometry is invalid (zero area).";
+  const [dLon, dLat] = ringSpan(poly);
+  if(dLon > MAX_SPAN_DEG || dLat > MAX_SPAN_DEG)
+    return "Validation: the extent spans "+dLon.toFixed(1)+"° × "+dLat.toFixed(1)+
+           "°, over the "+MAX_SPAN_DEG+"° × "+MAX_SPAN_DEG+"° limit for one analysis. Split it into smaller areas.";
+  if(a > MAX_AREA_HA)
+    return "Validation: "+Math.round(a).toLocaleString()+" ha is too large for one feature (limit "+
+           MAX_AREA_HA.toLocaleString()+" ha).";
+  if(a < MIN_AREA_HA)
+    return "Validation: "+a.toFixed(2)+" ha is smaller than one WaPOR pixel (1 ha at 100 m). "+
+           "Draw at least a hectare, or use a point instead.";
+  return null;
+}
+/* Usable but worth saying something about. */
+function areaNote(poly){
+  const a = areaHa(poly);
+  if(a < WARN_AREA_HA)
+    return Math.round(a*100)/100+" ha is only about "+Math.max(1,Math.round(a))+
+           " WaPOR pixel"+(Math.round(a) === 1 ? "" : "s")+" — the average will be dominated by field edges.";
+  return null;
+}
+
+function probeServer(){
+  if(typeof fetch !== "function") return;
+  const ctl = typeof AbortController === "function" ? new AbortController() : null;
+  const t = ctl ? setTimeout(() => ctl.abort(), 2500) : null;
+  fetch(API+"health", ctl ? { signal:ctl.signal } : undefined)
+    .then(r => r.ok ? r.json() : null)
+    .then(h => {
+      if(t) clearTimeout(t);
+      if(!h || h.status !== "ok") return;
+      SERVER = h;
+      const note = $("providerNote");
+      note.textContent = h.raster_stack
+        ? "Server connected · FAO WaPOR v3 retrieval"
+        : "Server connected · raster stack missing, cannot retrieve";
+      note.style.color = h.raster_stack ? "var(--green-700)" : "var(--red)";
+      note.style.fontWeight = "600";
+      render();
+    })
+    .catch(() => { if(t) clearTimeout(t); });
+}
+
+function lgpOf(sos,eos){
+  return Math.round((new Date(eos+"T00:00:00") - new Date(sos+"T00:00:00"))/86400000);
+}
+
+/* ── tooltip / toast ── */
+const tip = $("tip"), toast = $("toast");
+let toastT = null;
+function notify(msg){
+  toast.textContent = msg; toast.classList.add("show");
+  clearTimeout(toastT); toastT = setTimeout(() => toast.classList.remove("show"), 3600);
+}
+function tipRows(title, rows){
+  return '<div class="tt">'+esc(title)+"</div>"+
+    rows.map(r => '<div class="tr"><span>'+esc(r[0])+"</span><b>"+esc(r[1])+"</b></div>").join("");
+}
+document.addEventListener("pointerover", e => {
+  const t = e.target.closest && e.target.closest("[data-tip]");
+  if(!t) return;
+  tip.innerHTML = t.getAttribute("data-tip"); tip.style.opacity = "1"; moveTip(e);
+});
+document.addEventListener("pointermove", e => { if(tip.style.opacity === "1") moveTip(e); });
+document.addEventListener("pointerout", e => {
+  if(e.target.closest && e.target.closest("[data-tip]")) tip.style.opacity = "0";
+});
+function moveTip(e){
+  const r = tip.getBoundingClientRect();
+  tip.style.left = Math.min(Math.max(e.clientX, r.width/2+8), innerWidth-r.width/2-8)+"px";
+  tip.style.top  = Math.max(e.clientY-14, r.height+12)+"px";
+}
+
+/* =========================================================
+   Map — Leaflet with a basemap where it loads, inline SVG where it cannot
+   ========================================================= */
+const MAP = { ready:false, custom:{}, sketch:null, tiles:{}, cur:null, bounds:null };
+
+
+function bootLeaflet(){
+  const map = L.map($("map"), { zoomControl:true }).setView([9.9,40.1], 7);
+  MAP.map = map;
+  MAP.tiles = {
+    Streets: L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+      { attribution:"© OpenStreetMap contributors © CARTO", maxZoom:19 }),
+    Satellite: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { attribution:"Esri, Maxar, Earthstar Geographics", maxZoom:19 })
+  };
+  MAP.cur = MAP.tiles[S.basemap].addTo(map);
+  /* The survey layers are NOT drawn as always-on reference marks: at national zoom
+     each field is a few pixels and reads as unexplained green dots on the basemap.
+     MAP.bounds still frames them, so the map opens over the schemes. */
+  MAP.bounds = L.latLngBounds(
+    FIELDS.map(f => [f.lat0, f.lon0]).concat(POINTS.map(p => [p.lat, p.lon]))
+  ).pad(0.35);
+  map.fitBounds(MAP.bounds);
+  map.on("click", onMapClick);
+  map.on("dblclick", () => { if(S.drawing && S.inputMode === "polygon") finishDraw(); });
+  MAP.ready = true;
+  restyle();
+}
+
+function restyle(){
+  if(!MAP.ready) return;
+  const mk = S.metric, ex = extent(mk), done = S.run === "done";
+  Object.keys(MAP.custom).forEach(id => {
+    const lyr = MAP.custom[id], on = S.sel === "c"+id;
+    const c = S.customs.find(x => String(x.id) === String(id));
+    if(lyr.setStyle) lyr.setStyle({ weight:on ? 3.5 : 2, color:on ? "#7a5a17" : "#b07f28",
+      fillColor: done && c ? colorFor(c[mk],ex[0],ex[1]) : "#d9a03f", fillOpacity: done ? .78 : .45 });
+  });
+}
+
+function updateSketch(pts){
+  if(MAP.sketch) MAP.map.removeLayer(MAP.sketch);
+  MAP.sketch = L.polyline(pts.concat(pts.length > 2 ? [pts[0]] : []),
+    { color:"#d9a03f", weight:2, dashArray:"5 4" }).addTo(MAP.map);
+}
+function onMapClick(e){
+  if(!S.drawing) return;
+  if(S.inputMode === "point"){
+    if(MAP.sketch) MAP.map.removeLayer(MAP.sketch);
+    MAP.sketch = L.circleMarker([e.latlng.lat,e.latlng.lng],
+      { radius:7, color:"#b07f28", weight:2, fillColor:"#d9a03f", fillOpacity:1 }).addTo(MAP.map);
+    S.drawing = false; S.inputErr = null;
+    S.pending = { kind:"point", lat:e.latlng.lat, lng:e.latlng.lng };
+    openManual();
+  } else {
+    S.drawPts = S.drawPts.concat([[e.latlng.lat,e.latlng.lng]]);
+    updateSketch(S.drawPts);
+    renderSidebar(); renderMapChrome();
+  }
+}
+function cancelDraw(){
+  if(MAP.sketch && MAP.map){ MAP.map.removeLayer(MAP.sketch); MAP.sketch = null; }
+  S.drawing = false; S.drawPts = [];
+  render();
+}
+function finishDraw(){
+  if(S.drawPts.length < 3){
+    S.inputErr = "Validation: a polygon needs at least three vertices."; render(); return;
+  }
+  S.pending = { kind:"polygon", latlngs:S.drawPts.slice() };
+  S.drawing = false; S.drawPts = []; S.inputErr = null;
+  openManual();
+}
+
+/* ── SVG fallback map ── */
+function renderSvgMap(){
+  const pane = $("map");
+  pane.classList.add("svgmode");
+  const W = Math.max(320, pane.clientWidth), H = Math.max(260, pane.clientHeight);
+  const mk = S.metric, ex = extent(mk), done = S.run === "done";
+  const sf = S.sel && S.sel[0] === "f" ? FIELDS.find(f => "f"+f.id === S.sel) : null;
+  let s = "";
+  if(sf){
+    const ring = sf.ring_m, PAD = 46;
+    const xs = ring.map(c => c[0]), ys = ring.map(c => c[1]);
+    const x0 = Math.min.apply(null,xs), x1 = Math.max.apply(null,xs);
+    const y0 = Math.min.apply(null,ys), y1 = Math.max.apply(null,ys);
+    const k = Math.min((W-2*PAD)/Math.max(1,x1-x0), (H-2*PAD)/Math.max(1,y1-y0));
+    const ox = (W-(x1-x0)*k)/2, oy = (H-(y1-y0)*k)/2;
+    const X = v => ox+(v-x0)*k, Y = v => oy+(y1-v)*k;
+    s += '<path d="'+ring.map((c,i) => (i?"L":"M")+X(c[0]).toFixed(1)+" "+Y(c[1]).toFixed(1)).join("")+
+      'Z" fill="#c8d4c3" fill-opacity=".6" stroke="#d9a03f" stroke-width="3"/>';
+    (sf.pts_m||[]).forEach(q => {
+      if(q[2] === 1) s += '<circle cx="'+X(q[0]).toFixed(1)+'" cy="'+Y(q[1]).toFixed(1)+
+        '" r="4.5" fill="#b7c4b2" stroke="#fff" stroke-width="1.2"/>';
+    });
+    const spanM = Math.max(x1-x0, y1-y0);
+    const cand = [25,50,100,200,250,500,1000].filter(v => v <= spanM*0.45);
+    const sb = cand.length ? cand[cand.length-1] : 25, sbp = sb*k, sy = H-22;
+    s += '<line class="sbar" x1="20" y1="'+sy+'" x2="'+(20+sbp).toFixed(1)+'" y2="'+sy+'"/>'+
+      '<line class="sbar" x1="20" y1="'+(sy-4)+'" x2="20" y2="'+(sy+4)+'"/>'+
+      '<line class="sbar" x1="'+(20+sbp).toFixed(1)+'" y1="'+(sy-4)+'" x2="'+(20+sbp).toFixed(1)+'" y2="'+(sy+4)+'"/>'+
+      '<text class="sbarl" x="'+(20+sbp+8).toFixed(1)+'" y="'+(sy+4)+'">'+sb+" m</text>"+
+      '<text class="gratl" x="20" y="26">'+sf.lat0.toFixed(4)+"°N  "+sf.lon0.toFixed(4)+"°E</text>";
+  } else {
+    const lons = FIELDS.map(f => f.lon0).concat(POINTS.map(p => p.lon));
+    const lats = FIELDS.map(f => f.lat0).concat(POINTS.map(p => p.lat));
+    let lo0 = Math.min.apply(null,lons), lo1 = Math.max.apply(null,lons);
+    let la0 = Math.min.apply(null,lats), la1 = Math.max.apply(null,lats);
+    const mLo = (lo1-lo0)*0.16+0.05, mLa = (la1-la0)*0.10+0.05;
+    lo0 -= mLo; lo1 += mLo; la0 -= mLa; la1 += mLa;
+    const cosl = Math.cos((la0+la1)/2*Math.PI/180), PAD = 40;
+    const k = Math.min((W-2*PAD)/((lo1-lo0)*cosl), (H-2*PAD)/(la1-la0));
+    const ox = (W-(lo1-lo0)*cosl*k)/2, oy = (H-(la1-la0)*k)/2;
+    const X = lon => ox+(lon-lo0)*cosl*k, Y = lat => oy+(la1-lat)*k;
+    for(let g = Math.ceil(lo0*2)/2; g <= lo1; g += 0.5)
+      s += '<line class="grat" x1="'+X(g).toFixed(1)+'" y1="0" x2="'+X(g).toFixed(1)+'" y2="'+H+'"/>'+
+           '<text class="gratl" x="'+(X(g)+4).toFixed(1)+'" y="'+(H-8)+'">'+g.toFixed(1)+"°E</text>";
+    for(let g = Math.ceil(la0*2)/2; g <= la1; g += 0.5)
+      s += '<line class="grat" x1="0" y1="'+Y(g).toFixed(1)+'" x2="'+W+'" y2="'+Y(g).toFixed(1)+'"/>'+
+           '<text class="gratl" x="6" y="'+(Y(g)-5).toFixed(1)+'">'+g.toFixed(1)+"°N</text>";
+    S.customs.forEach(c => {
+      const on = S.sel === "c"+c.id;
+      const col = on ? "#7a5a17" : "#b07f28";
+      const fill = done ? colorFor(c[S.metric],ex[0],ex[1]) : "#d9a03f";
+      if(c.kind === "point")
+        s += '<circle cx="'+X(c.lng).toFixed(1)+'" cy="'+Y(c.lat).toFixed(1)+'" r="7" fill="'+fill+
+          '" stroke="'+col+'" stroke-width="'+(on?3.5:2)+'" data-sel="c'+c.id+'"/>';
+      else
+        s += '<path d="'+c.latlngs.map((p,i) => (i?"L":"M")+X(p[1]).toFixed(1)+" "+Y(p[0]).toFixed(1)).join("")+
+          'Z" fill="'+fill+'" fill-opacity="'+(done?.78:.45)+'" stroke="'+col+'" stroke-width="'+(on?3.5:2)+
+          '" data-sel="c'+c.id+'"/>';
+    });
+  }
+  pane.innerHTML = '<svg viewBox="0 0 '+W+" "+H+'" role="img" aria-label="Map of the analysed fields">'+s+"</svg>";
+  pane.querySelectorAll("[data-sel]").forEach(el => el.addEventListener("click", () => select(el.dataset.sel)));
+}
+
+/* =========================================================
+   Sidebar
+   ========================================================= */
+function renderSidebar(){
+  $("seg-point").classList.toggle("on", S.inputMode === "point");
+  $("seg-poly").classList.toggle("on", S.inputMode === "polygon");
+  const db = $("drawbtn");
+  db.textContent = S.drawing
+    ? "Cancel drawing"
+    : (S.inputMode === "point" ? "Drop a point on the map" : "Draw a polygon on the map");
+
+  $("drawpanel").innerHTML = S.drawing
+    ? '<div class="drawpanel"><div class="t">'+
+        (S.inputMode === "point" ? "Placing a point" : "Drawing a polygon")+"</div><p>"+
+        esc(S.inputMode === "point"
+          ? "Click the map to place your point · Esc to cancel"
+          : (S.drawPts.length < 3
+              ? "Click to add vertices — "+Math.max(0, 3-S.drawPts.length)+" more needed"
+              : "Double-click or press Finish polygon · Esc to cancel"))+"</p>"+
+        (S.inputMode === "polygon"
+          ? '<button class="fin" id="finbtn">Finish polygon ('+S.drawPts.length+" vertices)</button>"
+          : "")+
+        '<button class="can" id="canbtn">Cancel drawing</button></div>'
+    : "";
+  if($("finbtn")) $("finbtn").addEventListener("click", finishDraw);
+  if($("canbtn")) $("canbtn").addEventListener("click", cancelDraw);
+
+  const err = $("inputErr");
+  err.hidden = !S.inputErr;
+  err.textContent = S.inputErr || "";
+
+  $("clist").innerHTML = S.customs.map(c =>
+    '<div class="crow'+(S.sel === "c"+c.id ? " on" : "")+'">'+
+      '<button class="nm" data-sel="c'+c.id+'">'+esc(c.name+(c.kind === "point" ? "" : " · "+Math.round(c.area).toLocaleString()+" ha"))+"</button>"+
+      '<span class="wp">'+(c.WP_kgpm3 == null ? "—" : c.WP_kgpm3.toFixed(2))+"</span>"+
+      '<button class="x" data-rm="'+c.id+'" aria-label="Remove '+esc(c.name)+'">&#10005;</button>'+
+    "</div>").join("");
+  $("clist").querySelectorAll("[data-sel]").forEach(b =>
+    b.addEventListener("click", () => select(b.dataset.sel)));
+  $("clist").querySelectorAll("[data-rm]").forEach(b =>
+    b.addEventListener("click", e => { e.stopPropagation(); removeCustom(Number(b.dataset.rm)); }));
+
+  const hint = $("inputHint");
+  hint.textContent = S.drawing
+    ? (S.inputMode === "point"
+        ? "Click anywhere on the map. Esc cancels."
+        : "Click the map to add vertices, then double-click or press Finish. Esc cancels.")
+    : "";
+  hint.hidden = !hint.textContent;
+
+  $("runLabel").textContent = S.run === "running" ? "Running…" : (S.run === "done" ? "Re-run analysis" : "Run analysis");
+  $("runbtn").disabled = S.run === "running";
+
+  /* Describe the areas actually loaded. With none, asserting a season would
+     dress the draw defaults up as a property of the data. */
+  const all = S.customs.filter(c => c.SOS && c.EOS);
+  $("seasonChip").textContent = all.length
+    ? "Irrigated · "+fmtMY(all.map(c => c.SOS).sort()[0])+" – "+fmtMY(all.map(c => c.EOS).sort().slice(-1)[0])
+    : "Irrigated wheat";
+}
+
+/* =========================================================
+   Map chrome — draw tip, progress card, legend
+   ========================================================= */
+function renderMapChrome(){
+  const mt = $("maptip");
+  if(S.drawing){
+    mt.hidden = false;
+    mt.textContent = S.inputMode === "point"
+      ? "Click the map to place your point · Esc to cancel"
+      : (S.drawPts.length < 3
+          ? "Click to add vertices — "+Math.max(0, 3-S.drawPts.length)+" more needed"
+          : "Double-click or press Finish polygon · Esc to cancel");
+  } else mt.hidden = true;
+
+  const sp = $("spin");
+  sp.hidden = S.run !== "running";
+  if(S.run === "running"){
+    $("progText").textContent = S.prog+"/"+runTotal;
+    $("progBar").style.width = Math.round(S.prog/(runTotal||1)*100)+"%";
+    $("progPost").textContent = S.progPost;
+  }
+
+  const lg = $("legend");
+  lg.hidden = S.run !== "done";
+  if(S.run === "done"){
+    const M = METRICS[S.metric], ex = extent(S.metric);
+    $("lgTitle").textContent = M.label;
+    $("lgMin").textContent = M.fmt(ex[0]);
+    $("lgMax").textContent = M.fmt(ex[1]);
+    $("lgUnit").textContent = M.unit+" · across your areas of interest";
+  }
+
+  const mn = $("mapnote");
+  if(!HAS_L){
+    mn.hidden = false;
+    mn.textContent = "No basemap: this page could not load Leaflet or its map tiles, so fields are drawn at their coordinates instead. Select a field to see it to scale.";
+  } else mn.hidden = true;
+}
+
+/* =========================================================
+   Results panel
+   ========================================================= */
+/* Axis labels must be told apart. Uploaded features share a filename prefix
+   ("Irrigated_Wheat_2026 1..6"), and a bar is only ~50px wide, so plain
+   truncation leaves six identical "Irrigated..." labels. Drop the prefix every
+   label shares and the distinguishing tail survives; the full name stays in the
+   tooltip and the title attribute. */
+function axisLabels(rows){
+  const labels = rows.map(r => String(r.label));
+  if(labels.length < 2) return labels;
+  let pre = labels[0];
+  for(let n = 1; n < labels.length; n++){
+    const l = labels[n];
+    let i = 0;
+    while(i < pre.length && i < l.length && pre[i] === l[i]) i++;
+    pre = pre.slice(0, i);
+    if(!pre) break;
+  }
+  pre = pre.replace(/[\s_·:\-]+$/, "");
+  if(pre.length < 4) return labels;
+  const trimmed = labels.map(l => l.slice(pre.length).replace(/^[\s_·:\-]+/, ""));
+  return trimmed.every(t => t.length) ? trimmed : labels;
+}
+
+function columnChart(rows, ramp, dec, valColor){
+  const short = axisLabels(rows);
+  const mx = Math.max.apply(null, rows.map(r => r.v));
+  const step = nice(mx), top = Math.ceil(mx/step)*step;
+  let ticks = "", grid = "";
+  for(let v = top; v >= -1e-9; v -= step){
+    const t = ((1-v/top)*100).toFixed(3)+"%";
+    ticks += '<i style="top:'+t+'">'+v.toFixed(dec)+"</i>";
+    grid  += '<hr style="top:'+t+'">';
+  }
+  const lo = Math.min.apply(null, rows.map(r => r.v)), hi = mx;
+  const bars = rows.map((r, i) => {
+    const ci = Math.max(0, Math.min(ramp.length-1, Math.floor(((r.v-lo)/((hi-lo)||1))*ramp.length)));
+    return '<button class="bar'+(S.sel === r.sel ? " on" : "")+'" data-sel="'+esc(r.sel)+
+      '" title="'+esc(r.full)+'" data-tip="'+esc(tipRows(r.full, [[r.metric, r.v.toFixed(2)+" "+r.unit]]))+'">'+
+      '<span class="v" style="color:'+valColor+'">'+r.v.toFixed(2)+"</span>"+
+      '<span class="b" style="height:'+Math.max(2,(r.v/top)*100)+"%;background:"+ramp[ci]+'"></span>'+
+      '<span class="t">'+esc(short[i])+"</span></button>";
+  }).join("");
+  return '<div class="cc"><div class="ax">'+ticks+'</div><div class="pl">'+grid+
+    '<div class="bars">'+bars+'</div></div></div><div class="ccpad"></div>';
+}
+
+function validationBlock(rows){
+  const num = v => (v === "" || v == null || isNaN(Number(v)) ? null : Number(v));
+  const diff = (est,o) => {
+    if(o == null || !o) return { txt:"—", color:"#5f6f64" };
+    const p = ((est-o)/o)*100;
+    return { txt:(p >= 0 ? "+" : "")+p.toFixed(0)+"%",
+             color: Math.abs(p) <= 10 ? "#1a5735" : Math.abs(p) <= 25 ? "#7a5a17" : "#c2452d" };
+  };
+  const line = (r,fk) => {
+    const cur = (S.obs[r.key]||{})[fk];
+    const est = fk === "y" ? r.yv : r.wv;
+    const d = est == null ? { txt:"—", color:"#5f6f64" } : diff(est, num(cur));
+    return '<div class="valrow"><span class="lb">'+esc(r.label)+"</span>"+
+      '<span class="est">'+fmt(est,2)+"</span>"+
+      '<input type="number" min="0" step="0.01" placeholder="—" value="'+esc(cur == null ? "" : cur)+
+      '" data-obs="'+esc(r.key)+'" data-fk="'+fk+'" aria-label="Measured '+
+      (fk === "y" ? "yield" : "water productivity")+' for '+esc(r.label)+'">'+
+      '<span class="df" style="color:'+d.color+'">'+d.txt+"</span></div>";
+  };
+  const pairs = rows.map(r => ({ est:r.yv, o:num((S.obs[r.key]||{}).y) }))
+    .filter(x => x.est != null && x.o != null && x.o > 0);
+  const n = pairs.length;
+  const bias = n ? mean(pairs.map(x => x.est-x.o)) : null;
+  const rmse = n ? Math.sqrt(mean(pairs.map(x => Math.pow(x.est-x.o,2)))) : null;
+  return '<div class="valbox">'+
+    '<div class="valhd"><span class="w74">Plot</span><span class="w46">Est.</span>'+
+      '<span class="w62">Measured</span><span class="fl1">Diff</span></div>'+
+    '<div class="valgrp"><b>Yield</b><i>t/ha</i></div>'+rows.map(r => line(r,"y")).join("")+
+    '<div class="valgrp"><b>Water productivity</b><i>kg/m³</i></div>'+rows.map(r => line(r,"w")).join("")+
+    '<div class="valstats">'+
+      '<div><div class="l">Pairs</div><div class="v">'+n+"</div></div>"+
+      '<div><div class="l">Bias</div><div class="v">'+(n ? (bias >= 0 ? "+" : "")+bias.toFixed(2) : "—")+"</div></div>"+
+      '<div><div class="l">RMSE</div><div class="v">'+(n ? rmse.toFixed(2) : "—")+"</div></div></div>"+
+    '<p style="font-size:10.5px;color:#5f6f64;line-height:1.45;margin:8px 0 0">'+
+      (n ? "Bias and RMSE are computed on the "+n+" yield pair"+(n === 1 ? "" : "s")+" entered, in t/ha. A positive bias means the estimate reads high."
+         : "Type a measured yield or water productivity to compare it with the estimate. Differences within 10% show green, to 25% amber, beyond that red.")+
+    "</p></div>";
+}
+
+function renderPanel(){
+  const host = $("results");
+  const sf = S.sel && S.sel[0] === "f" ? FIELDS.find(f => "f"+f.id === S.sel) : null;
+  const sg = S.sel && S.sel[0] === "g" ? P.pointAgg.find(g => "g"+g.name+g.loc === S.sel) : null;
+  const sc = S.sel && S.sel[0] === "c" ? S.customs.find(c => "c"+c.id === S.sel) : null;
+  const showDetail = !!(sf || sg || sc);
+  const showResults = S.run === "done" || showDetail;
+  host.hidden = !showResults;
+  if(!showResults){ host.innerHTML = ""; if(MAP.ready) MAP.map.invalidateSize(); return; }
+
+  /* network mean: the areas of interest if any have been run, else the survey fields */
+  const netSrc = (S.run === "done" && S.customs.length) ? S.customs : FIELDS;
+  const wps = netSrc.map(c => c.WP_kgpm3).filter(v => v != null);
+  const netMean = wps.length ? mean(wps) : null;
+  let h = "";
+
+  if(showDetail){
+    const o = sf || sg || sc;
+    const wp = o.WP_kgpm3;
+    const dPct = (wp != null && netMean) ? (wp-netMean)/netMean*100 : null;
+    let title, sub, gpts = [];
+    if(sf){
+      title = o.name+" — field "+o.id;
+      sub = "Scheme "+o.scheme+" · irrigated wheat · WaPOR v3 seasonal result";
+      gpts = P.pointAgg.filter(g => g.name === o.name);
+    } else if(sg){
+      title = o.name+" — plot "+o.loc;
+      sub = "Monitoring points · plot "+o.loc+" · median of "+o.n+" samples";
+      gpts = [o];
+    } else {
+      title = o.name;
+      sub = (o.kind === "point" ? "Point" : "Polygon")+" · ID "+o.id+
+            (o.kind === "point" ? " · plot "+o.loc : "")+" · WaPOR v3 seasonal result";
+    }
+    h += '<div class="rhead"><button class="back" id="back" aria-label="Back to season results">&larr;</button>'+
+      "<div><h2>"+esc(title)+'</h2><div class="sub">'+esc(sub)+"</div></div></div>";
+    const sub2 = wp == null
+      ? "Not estimated yet — press Run analysis"
+      : (dPct == null ? "" : (dPct >= 0 ? "+" : "")+dPct.toFixed(0)+"% vs network mean ("+netMean.toFixed(2)+" kg/m³)");
+    h += '<div class="kpis">'+
+      '<div class="kpi hero"><div class="l">Water productivity</div>'+
+        '<div class="v">'+fmt(wp,2)+' <span class="u">kg/m³</span></div>'+
+        '<div class="u">'+esc(sub2)+"</div></div>"+
+      '<div class="kpi"><div class="l">Est. yield</div><div class="v">'+fmt(o.EYield_tpha,2)+'</div><div class="u">t/ha</div></div>'+
+      '<div class="kpi"><div class="l">Seasonal AETI</div><div class="v">'+(o.AETI_mm == null ? "—" : Math.round(o.AETI_mm))+'</div><div class="u">mm</div></div>'+
+      '<div class="kpi"><div class="l">Seasonal NPP</div><div class="v">'+fmt(o.NPP,0)+'</div><div class="u">gC/m²</div></div>'+
+      '<div class="kpi"><div class="l">Area</div><div class="v">'+
+        (sf ? o.area_ha.toFixed(1) : (sc && o.area != null ? o.area.toFixed(1) : "—"))+'</div><div class="u">ha</div></div>'+
+      "</div>"+
+      '<div class="gp"><div><div class="l">Growing period</div><div class="d">'+
+        fmtDate(sf ? o.sos : (sg ? o.sos : o.SOS))+" → "+fmtDate(sf ? o.eos : (sg ? o.eos : o.EOS))+
+        '</div></div><div class="r"><div class="n">'+(sf ? o.LGP : (sg ? o.lgp : o.LGP))+
+        '</div><div class="u">days (LGP)</div></div></div>';
+    if(sf && o.nInside === 0){
+      h += '<div class="chartsec"><div class="banner" style="margin:0">'+
+        "<b>No monitoring points fall inside this field.</b> Nothing checks this estimate, and its "+
+        "seasonal AETI is a third below its two neighbours on the same season window — consistent "+
+        "with part of the mapped area not having been cropped.</div></div>";
+    }
+    if(gpts.length){
+      h += '<div class="chartsec"><h3>Farm plots — '+esc(o.name)+"</h3>"+
+        '<div class="note">Median of '+gpts.reduce((s,g) => s+g.n, 0)+" monitoring points, aggregated by plot</div>"+
+        '<div class="tbox"><table class="dtable"><thead><tr><th>Plot</th><th>Yield t/ha</th>'+
+        "<th>AETI mm</th><th>WP kg/m³</th></tr></thead><tbody>"+
+        gpts.map(g => "<tr><td>Plot "+g.loc+" · "+g.n+" pts</td><td>"+g.EYield_tpha.toFixed(2)+
+          "</td><td>"+Math.round(g.AETI_mm)+'</td><td class="wp">'+g.WP_kgpm3.toFixed(2)+"</td></tr>").join("")+
+        "</tbody></table></div></div>";
+    }
+  } else {
+    const cs = S.customs.slice().sort((a,b) => a.id-b.id);
+    const src = cs.length ? cs : FIELDS;
+    const isSurvey = !cs.length;
+    h += '<div class="rhead"><div><h2>Season results<span class="badge">WaPOR v3</span></h2>'+
+      '<div class="sub">'+esc(isSurvey
+        ? "6 survey fields · 57 monitoring points · etwapor estimates"
+        : (cs.length === 1 ? "1 area of interest" : cs.length+" areas of interest")+" · FAO WaPOR v3")+
+      "</div></div></div>";
+    const areaTot = src.reduce((s,c) => s+(isSurvey ? c.area_ha : (c.area||0)), 0);
+    h += '<div class="kpis">'+
+      '<div class="kpi hero"><div class="l">Mean water productivity</div>'+
+        '<div class="v">'+mean(src.map(c => c.WP_kgpm3)).toFixed(2)+' <span class="u">kg/m³</span></div>'+
+        '<div class="u">'+esc(src.length > 1
+          ? "Range across areas of interest: "+Math.min.apply(null,src.map(c => c.WP_kgpm3)).toFixed(2)+" – "+
+            Math.max.apply(null,src.map(c => c.WP_kgpm3)).toFixed(2)+" kg/m³"
+          : "Single area of interest")+"</div></div>"+
+      '<div class="kpi"><div class="l">Mean est. yield</div><div class="v">'+mean(src.map(c => c.EYield_tpha)).toFixed(2)+'</div><div class="u">t/ha</div></div>'+
+      '<div class="kpi"><div class="l">Mean AETI</div><div class="v">'+Math.round(mean(src.map(c => c.AETI_mm)))+'</div><div class="u">mm</div></div>'+
+      '<div class="kpi"><div class="l">Area analysed</div><div class="v">'+(areaTot ? areaTot.toFixed(1) : "—")+'</div><div class="u">ha</div></div>'+
+      '<div class="kpi"><div class="l">Features analysed</div><div class="v">'+src.length+'</div><div class="u">'+
+        (isSurvey ? "fields" : "points &amp; polygons")+"</div></div>"+
+      "</div>";
+    const rows = src.map(c => ({
+      v:0, label: isSurvey ? c.label : c.name, full:(isSurvey ? c.label+" · "+c.scheme : c.name),
+      sel:(isSurvey ? "f"+c.id : "c"+c.id)
+    }));
+    const yRows = rows.map((r,i) => Object.assign({}, r, { v:src[i].EYield_tpha, metric:"est. yield", unit:"t/ha" }));
+    const wRows = rows.map((r,i) => Object.assign({}, r, { v:src[i].WP_kgpm3, metric:"water productivity", unit:"kg/m³" }));
+    h += '<div class="chartsec"><h3>Estimated crop yield <span style="font-weight:600;color:#5f6f64">(t/ha)</span></h3>'+
+      '<div class="note">Click a bar to open that plot&rsquo;s detail</div>'+
+      '<div class="chartbox">'+columnChart(yRows, RAMP, 1, "#1a5735")+"</div></div>"+
+      '<div class="chartsec"><h3>Water productivity <span style="font-weight:600;color:#5f6f64">(kg/m³)</span></h3>'+
+      '<div class="chartbox">'+columnChart(wRows, WP_RAMP, 2, "#1d5c8a")+"</div></div>";
+  }
+
+  const vsrc = S.customs.length ? S.customs : FIELDS;
+  const vrows = vsrc.map(c => ({
+    key:(S.customs.length ? "c" : "f")+c.id,
+    label:(S.customs.length ? c.name : c.label),
+    yv:c.EYield_tpha, wv:c.WP_kgpm3
+  }));
+  h += '<div class="chartsec"><button class="valbtn" id="valtoggle">'+
+    (S.validationOpen ? "Hide field-data validation" : "Compare with field data (optional)")+"</button>"+
+    (S.validationOpen
+      ? '<div class="note" style="margin:10px 0 0">Optional — enter measured values to compare with the WaPOR estimates</div>'+validationBlock(vrows)
+      : "")+"</div>"+
+    '<div class="exportrow"><button id="exportbtn"'+(S.customs.length ? "" : " disabled title=\"Add an area of interest and run the analysis to export\"")+
+    ">Export results (CSV)</button></div>";
+
+  host.innerHTML = h;
+  host.scrollTop = 0;
+  if($("back")) $("back").addEventListener("click", () => select(null));
+  if($("valtoggle")) $("valtoggle").addEventListener("click", () => { S.validationOpen = !S.validationOpen; renderPanel(); });
+  if($("exportbtn")) $("exportbtn").addEventListener("click", exportAoi);
+  host.querySelectorAll("[data-sel]").forEach(b => b.addEventListener("click", () => select(b.dataset.sel)));
+  bindObs(vrows);
+  if(MAP.ready) MAP.map.invalidateSize();
+}
+function bindObs(vrows){
+  const host = $("results");
+  host.querySelectorAll("[data-obs]").forEach(inp => {
+    if(inp.__bound) return;
+    inp.__bound = true;
+    inp.addEventListener("input", () => {
+      const k = inp.dataset.obs, fk = inp.dataset.fk;
+      S.obs[k] = S.obs[k] || {};
+      S.obs[k][fk] = inp.value;
+      const box = inp.closest(".valbox");
+      const wrap = document.createElement("div");
+      wrap.innerHTML = validationBlock(vrows);
+      box.replaceWith(wrap.firstElementChild);
+      const again = host.querySelector('[data-obs="'+k+'"][data-fk="'+fk+'"]');
+      if(again){ again.focus(); try{ again.setSelectionRange(again.value.length, again.value.length); }catch(e){} }
+      bindObs(vrows);
+    });
+  });
+}
+
+/* =========================================================
+   Plot attributes dialog
+   ========================================================= */
+function openManual(){
+  S.manualOpen = true;
+  const g = S.pending;
+  $("pendingSummary").textContent = !g ? "" : g.kind === "point"
+    ? "Point at "+g.lat.toFixed(4)+", "+g.lng.toFixed(4)
+    : "Polygon · "+g.latlngs.length+" vertices · "+Math.round(areaHa(g.latlngs)).toLocaleString()+" ha";
+  $("inpId").value = S.idVal;
+  $("inpName").value = S.nameVal;
+  $("inpSos").value = S.sos;
+  $("inpEos").value = S.eos;
+  $("inpLoc").value = S.loc;
+  $("locFld").hidden = !(g && g.kind === "point");
+  $("manualErr").hidden = true;
+  $("manualHint").textContent = "ID must be a unique positive integer and Plot name is required. SOS/EOS are validated (EOS after SOS) before the feature is added.";
+  $("m-manual").hidden = false;
+  $("inpName").focus();
+  render();
+}
+function validateInput(kind, geom){
+  const idn = Number(S.idVal);
+  if(!Number.isInteger(idn) || idn < 1) return "Validation: ID must be a positive integer.";
+  if(S.customs.some(c => c.id === idn)) return "Validation: ID "+idn+" is already used — IDs must uniquely identify each feature.";
+  if(!S.nameVal.trim()) return "Validation: plot Name is required.";
+  if(!S.sos || !S.eos) return "Validation: SOS and EOS are required.";
+  const ds = new Date(S.sos+"T00:00:00"), de = new Date(S.eos+"T00:00:00");
+  if(isNaN(ds.getTime()) || isNaN(de.getTime())) return "Validation: SOS/EOS must be valid dates.";
+  if(de <= ds) return "Validation: EOS must occur after SOS.";
+  if(kind === "point"){
+    const loc = Number(S.loc);
+    if(!Number.isInteger(loc) || loc < 1) return "Validation: Location must be a positive integer plot number.";
+  } else {
+    if(!geom.latlngs || geom.latlngs.length < 3) return "Validation: a polygon needs at least 3 vertices.";
+    const problem = areaProblem(geom.latlngs);
+    if(problem) return problem;
+  }
+  return null;
+}
+function commitPending(){
+  const g = S.pending;
+  if(!g) return;
+  S.idVal = $("inpId").value; S.nameVal = $("inpName").value;
+  S.sos = $("inpSos").value; S.eos = $("inpEos").value; S.loc = $("inpLoc").value;
+  const err = validateInput(g.kind, g);
+  if(err){ $("manualErr").hidden = false; $("manualErr").textContent = err; return; }
+  if(MAP.sketch && MAP.map){ MAP.map.removeLayer(MAP.sketch); MAP.sketch = null; }
+  const note = g.kind === "polygon" ? areaNote(g.latlngs) : null;
+  S.pending = null; S.manualOpen = false; S.inputErr = null;
+  $("m-manual").hidden = true;
+  addCustom(Object.assign({}, g, { id:Number(S.idVal), name:S.nameVal.trim() }));
+  if(note) notify(note);
+}
+function discardPending(){
+  if(MAP.sketch && MAP.map){ MAP.map.removeLayer(MAP.sketch); MAP.sketch = null; }
+  S.pending = null; S.manualOpen = false; S.drawing = false; S.drawPts = []; S.inputErr = null;
+  $("m-manual").hidden = true;
+  render();
+}
+function addCustom(g){
+  const id = g.id != null ? g.id : (cid = cid+1);
+  cid = Math.max(cid, id);
+  const sos = g.SOS || S.sos, eos = g.EOS || S.eos;
+  /* No numbers until the model produces them — nothing here is invented. */
+  const m = { NPP:null, EYield_tpha:null, AETI_mm:null, WP_kgpm3:null, LGP:lgpOf(sos,eos) };
+  const rec = Object.assign({}, g, m, {
+    id:id,
+    name:(g.name && g.name.trim()) || (g.kind === "point" ? "Point "+id : "Area "+id),
+    SOS:sos, EOS:eos,
+    loc: g.kind === "point" ? Number(g.loc != null ? g.loc : S.loc) : null,
+    area: g.kind === "polygon" ? areaHa(g.latlngs) : null
+  });
+  if(MAP.ready){
+    let lyr;
+    if(g.kind === "point")
+      lyr = L.circleMarker([g.lat,g.lng], { radius:7, color:"#b07f28", weight:2, fillColor:"#d9a03f", fillOpacity:.9 });
+    else
+      lyr = L.polygon(g.latlngs, { color:"#b07f28", weight:2, dashArray:"5 4", fillColor:"#d9a03f", fillOpacity:.45 });
+    lyr.on("click", () => select("c"+id));
+    lyr.bindTooltip((g.kind === "point" ? "Custom point " : "Custom area ")+id, { sticky:true });
+    lyr.addTo(MAP.map);
+    MAP.custom[id] = lyr;
+  }
+  S.customs = S.customs.concat([rec]);
+  S.sel = "c"+id;
+  S.idVal = String(cid+1);
+  S.nameVal = "";
+  if(S.run === "done") S.run = "idle";
+  flyTo("c"+id);
+  render();
+}
+function removeCustom(id){
+  if(MAP.custom[id]){ MAP.map.removeLayer(MAP.custom[id]); delete MAP.custom[id]; }
+  S.customs = S.customs.filter(c => c.id !== id);
+  if(S.sel === "c"+id) S.sel = null;
+  if(!S.customs.length && S.run === "done") S.run = "idle";
+  render();
+}
+
+/* =========================================================
+   Upload — the canvas's .shp / .dbf / GeoJSON readers
+   ========================================================= */
+function parseShp(buf){
+  const dv = new DataView(buf), len = dv.getInt32(24,false)*2;
+  const out = []; let p = 100;
+  while(p < len && p+12 <= buf.byteLength){
+    const cl = dv.getInt32(p+4,false)*2, st = dv.getInt32(p+8,true), s = p+8;
+    if(st === 1 || st === 11 || st === 21)
+      out.push({ type:"Point", coordinates:[dv.getFloat64(s+4,true), dv.getFloat64(s+12,true)] });
+    else if(st === 8 || st === 18 || st === 28){
+      const n = dv.getInt32(s+40,true), o = s+44, cs = [];
+      for(let i = 0; i < n; i++) cs.push([dv.getFloat64(o+i*16,true), dv.getFloat64(o+i*16+8,true)]);
+      out.push({ type:"MultiPoint", coordinates:cs });
+    } else if(st === 5 || st === 15 || st === 25){
+      /* Polygon types only. PolyLine (3/13/23) is skipped, matching Help § 4 — the canvas
+         converts lines to polygons here, which contradicts its own documentation. */
+      const np = dv.getInt32(s+36,true), nn = dv.getInt32(s+40,true), parts = [];
+      for(let i = 0; i < np; i++) parts.push(dv.getInt32(s+44+i*4,true));
+      const o = s+44+np*4;
+      for(let i = 0; i < np; i++){
+        const a = parts[i], b = i+1 < np ? parts[i+1] : nn, ring = [];
+        for(let j = a; j < b; j++) ring.push([dv.getFloat64(o+j*16,true), dv.getFloat64(o+j*16+8,true)]);
+        if(ring.length >= 3) out.push({ type:"Polygon", coordinates:[ring] });
+      }
+    } else if(st !== 0) out.push(null);
+    p += 8+cl;
+  }
+  return out;
+}
+function parseDbf(buf){
+  const dv = new DataView(buf), dec = new TextDecoder("latin1");
+  const nRec = dv.getUint32(4,true), hdr = dv.getUint16(8,true), recLen = dv.getUint16(10,true);
+  const flds = [];
+  for(let o = 32; o < hdr-1; o += 32){
+    if(dv.getUint8(o) === 0x0d) break;
+    let name = "";
+    for(let i = 0; i < 11; i++){ const c = dv.getUint8(o+i); if(!c) break; name += String.fromCharCode(c); }
+    flds.push({ name:name, type:String.fromCharCode(dv.getUint8(o+11)), len:dv.getUint8(o+16) });
+  }
+  const recs = [];
+  for(let r = 0; r < nRec; r++){
+    let p = hdr+r*recLen+1; const rec = {};
+    for(let i = 0; i < flds.length; i++){
+      const f = flds[i];
+      const raw = dec.decode(new Uint8Array(buf, p, f.len)).trim(); p += f.len;
+      if(f.type === "N" || f.type === "F") rec[f.name] = raw === "" ? null : parseFloat(raw);
+      else if(f.type === "D") rec[f.name] = raw ? raw.slice(0,4)+"-"+raw.slice(4,6)+"-"+raw.slice(6,8) : null;
+      else rec[f.name] = raw;
+    }
+    recs.push(rec);
+  }
+  return recs;
+}
+let DBF = null;
+
+/* Central-directory walk. A zipped shapefile is the only single file that brings
+   the .dbf along, and the .dbf is where Name, ID, Location and SOS/EOS live. */
+function zipEntries(buf){
+  const dv = new DataView(buf), u8 = new Uint8Array(buf);
+  let eocd = -1;
+  const floor = Math.max(0, buf.byteLength - 66000);
+  for(let i = buf.byteLength - 22; i >= floor; i--){
+    if(dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; }
+  }
+  if(eocd < 0) throw new Error("not a zip archive (no end-of-central-directory record)");
+  const count = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const out = [];
+  for(let n = 0; n < count; n++){
+    if(p + 46 > buf.byteLength || dv.getUint32(p, true) !== 0x02014b50) break;
+    const method = dv.getUint16(p + 10, true);
+    const csize = dv.getUint32(p + 20, true);
+    const nameLen = dv.getUint16(p + 28, true);
+    const extraLen = dv.getUint16(p + 30, true);
+    const commentLen = dv.getUint16(p + 32, true);
+    const lho = dv.getUint32(p + 42, true);
+    const name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nameLen));
+    const lNameLen = dv.getUint16(lho + 26, true);
+    const lExtraLen = dv.getUint16(lho + 28, true);
+    const start = lho + 30 + lNameLen + lExtraLen;
+    out.push({ name:name, method:method, raw:u8.subarray(start, start + csize) });
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return out;
+}
+function inflateEntry(entry){
+  if(entry.method === 0) return Promise.resolve(entry.raw);
+  if(entry.method !== 8) return Promise.reject(new Error("unsupported zip compression method "+entry.method));
+  if(typeof DecompressionStream !== "function")
+    return Promise.reject(new Error("this browser cannot expand compressed zip entries — select the .shp and .dbf instead"));
+  const stream = new Blob([entry.raw]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Response(stream).arrayBuffer().then(b => new Uint8Array(b));
+}
+function readZip(file){
+  const fr = new FileReader();
+  fr.onload = () => {
+    let entries;
+    try{ entries = zipEntries(fr.result); }
+    catch(e){ S.inputErr = "Upload failed: "+e.message; render(); return; }
+    const pick = re => entries.find(e => re.test(e.name) && !/(^|\/)__MACOSX\//.test(e.name));
+    const shp = pick(/\.shp$/i), dbf = pick(/\.dbf$/i);
+    const gj  = pick(/\.(geojson|json)$/i);
+    if(!shp && !gj){
+      S.inputErr = "Upload failed: the archive holds no .shp or GeoJSON — found "+
+        (entries.length ? entries.map(e => e.name).slice(0,6).join(", ") : "nothing");
+      render(); return;
+    }
+    if(shp && !dbf) notify("The archive has no .dbf — plots will be numbered, not named.");
+    Promise.all([shp ? inflateEntry(shp) : null, dbf ? inflateEntry(dbf) : null,
+                 gj && !shp ? inflateEntry(gj) : null])
+      .then(([shpBytes, dbfBytes, gjBytes]) => {
+        DBF = null;
+        if(dbfBytes){ try{ DBF = parseDbf(dbfBytes.buffer.slice(dbfBytes.byteOffset, dbfBytes.byteOffset + dbfBytes.byteLength)); }catch(e){ DBF = null; } }
+        if(shpBytes) ingestGeom(shpBytes.buffer.slice(shpBytes.byteOffset, shpBytes.byteOffset + shpBytes.byteLength), true);
+        else ingestGeom(new TextDecoder().decode(gjBytes), false);
+      })
+      .catch(e => { S.inputErr = "Upload failed: "+e.message; render(); });
+  };
+  fr.readAsArrayBuffer(file);
+}
+
+function handleUpload(ev){
+  const list = Array.prototype.slice.call(ev.target.files);
+  ev.target.value = "";
+  /* Pick the geometry file by extension. Taking "the first non-.dbf" instead
+     grabs a sidecar — select .shp/.shx/.dbf/.prj together and .prj wins, which
+     then fails as invalid JSON. */
+  const zip = list.find(f => /\.zip$/i.test(f.name));
+  const file = list.find(f => /\.shp$/i.test(f.name)) ||
+               list.find(f => /\.(geojson|json)$/i.test(f.name));
+  const dbfFile = list.find(f => /\.dbf$/i.test(f.name));
+  if(zip && !file){
+    if(!seasonOk()) return;
+    readZip(zip);
+    return;
+  }
+  if(!file){
+    S.inputErr = list.length
+      ? "Select a zipped shapefile, a .shp (with its .dbf), or a GeoJSON file — none of the chosen files carries geometry."
+      : null;
+    render();
+    return;
+  }
+  if(/\.shp$/i.test(file.name) && !dbfFile){
+    /* Geometry alone imports, but Name/ID/Location/SOS/EOS live in the .dbf. */
+    notify("No .dbf selected — plots will be numbered, not named. Pick the .shp and .dbf together.");
+  }
+  if(dbfFile){
+    const dr = new FileReader();
+    dr.onload = () => { try{ DBF = parseDbf(dr.result); }catch(e){ DBF = null; } readGeom(file); };
+    dr.readAsArrayBuffer(dbfFile);
+    return;
+  }
+  DBF = null;
+  readGeom(file);
+}
+function seasonOk(){
+  const ds = new Date(S.sos+"T00:00:00"), de = new Date(S.eos+"T00:00:00");
+  if(!S.sos || !S.eos || isNaN(ds.getTime()) || isNaN(de.getTime()) || de <= ds){
+    S.inputErr = "Validation: set valid SOS/EOS (EOS after SOS) before uploading.";
+    render();
+    return false;
+  }
+  return true;
+}
+function readGeom(file){
+  if(!seasonOk()) return;
+  const isShp = /\.shp$/i.test(file.name);
+  const reader = new FileReader();
+  reader.onload = () => ingestGeom(reader.result, isShp);
+  if(isShp) reader.readAsArrayBuffer(file); else reader.readAsText(file);
+}
+
+/* Shared by the loose-files path and the zip path: parse geometry, pair each
+   feature with its .dbf record, and add it. */
+function ingestGeom(data, isShp){
+    try{
+      let geoms;
+      if(isShp) geoms = parseShp(data);
+      else {
+        const gj = JSON.parse(data);
+        const feats = gj.type === "FeatureCollection" ? gj.features : gj.type === "Feature" ? [gj] : [{ geometry:gj }];
+        const pick = pr => {
+          if(!pr) return null;
+          const k = Object.keys(pr).find(k => /^(name|plot_?name|plot|field|label|title|id_name)$/i.test(k));
+          const v = k ? pr[k] : null;
+          return v == null || String(v).trim() === "" ? null : String(v).trim();
+        };
+        geoms = feats.map(f => {
+          const g = (f && f.geometry) || f;
+          if(g && f && f.properties) g.__name = pick(f.properties);
+          return g;
+        });
+      }
+      let seq = 0, fi = -1, added = 0, skipped = 0;
+      const rejected = [];
+      const key = (rec,re) => {
+        if(!rec) return null;
+        const k = Object.keys(rec).find(k => re.test(k));
+        const v = k ? rec[k] : null;
+        return v == null || String(v).trim() === "" ? null : v;
+      };
+      const attrFor = g => {
+        seq++;
+        const rec = DBF && DBF[fi] ? DBF[fi] : null;
+        const nm = key(rec, /^(name|plot_?name|plot|field|label|title)$/i);
+        const idv = key(rec, /^(id|fid|plot_?id|objectid)$/i);
+        return {
+          /* Name order: the geometry's own property, then the .dbf Name column,
+             then the plot's position. Never the filename — every feature in one
+             upload would share it, which names the file rather than the plot. */
+          name: g.__name || (nm != null ? String(nm) : "Plot "+seq),
+          id: Number.isInteger(Number(idv)) && Number(idv) > 0 && !S.customs.some(c => c.id === Number(idv)) ? Number(idv) : undefined,
+          loc: key(rec, /^(location|loc|plot_?no|plot_?number)$/i),
+          SOS: key(rec, /^sos$/i), EOS: key(rec, /^eos$/i)
+        };
+      };
+      const flip = c => [c[1], c[0]];
+      geoms.slice(0,200).forEach(g => {
+        fi++;
+        if(!g || !g.type){ skipped++; return; }
+        if(g.type === "Point"){ addCustom(Object.assign({ kind:"point" }, attrFor(g), { lat:g.coordinates[1], lng:g.coordinates[0] })); added++; }
+        else if(g.type === "MultiPoint") g.coordinates.forEach(c => { addCustom(Object.assign({ kind:"point" }, attrFor(g), { lat:c[1], lng:c[0] })); added++; });
+        else if(g.type === "Polygon"){
+          const ll = g.coordinates[0].map(flip);
+          if(areaProblem(ll)){ rejected.push(areaProblem(ll)); return; }
+          addCustom(Object.assign({ kind:"polygon" }, attrFor(g), { latlngs:ll })); added++;
+        }
+        else if(g.type === "MultiPolygon") g.coordinates.forEach(pp => {
+          const ll = pp[0].map(flip);
+          if(areaProblem(ll)){ rejected.push(areaProblem(ll)); return; }
+          addCustom(Object.assign({ kind:"polygon" }, attrFor(g), { latlngs:ll })); added++;
+        });
+        else skipped++;
+      });
+      if(!added) S.inputErr = rejected.length
+        ? "Nothing added — "+rejected[0]
+        : "Validation: no point or polygon geometries found (GeoJSON or .shp, EPSG:4326).";
+      else {
+        S.inputErr = rejected.length
+          ? rejected.length+" feature"+(rejected.length === 1 ? "" : "s")+" rejected on size — "+rejected[0]
+          : skipped ? skipped+" unsupported geometries skipped; "+added+" added." : null;
+        notify(added+" feature"+(added === 1 ? "" : "s")+" added — press Run analysis.");
+        if(MAP.ready){
+          try{
+            const lys = Object.keys(MAP.custom).map(k => MAP.custom[k]);
+            if(lys.length) MAP.map.fitBounds(L.featureGroup(lys).getBounds().pad(0.3));
+          }catch(e){}
+        }
+      }
+      render();
+    }catch(ex){ S.inputErr = "Upload failed: "+ex.message; render(); }
+}
+
+/* The template is the real 2026 survey layer, exported from the geometry and
+   attributes this page already carries — two features, enough to show the shape of
+   the file without shipping the whole survey. Nothing invented: upload it back and
+   the plot names, seasons and Locations come through exactly as they do from the
+   shapefile. Field names match the reference notebook's own columns. */
+const TPL_N = 2;
+const TPL_CROP = { Crop:"Wheat", Crop_ID:"CER01" };
+function template(kind){
+  if(kind === "poly"){
+    return {
+      type:"FeatureCollection",
+      name:"Irrigated_Wheat_2026",
+      _README:[
+        "Irrigated wheat 2026 - field boundaries. Two features from the real survey",
+        "layer, as a template for your own scheme: keep the property names and",
+        "replace the values and geometry. Add as many features as you need.",
+        "Required: ID (unique positive integer), Name, SOS and EOS (ISO dates,",
+        "EOS after SOS). Coordinates are [longitude, latitude] in EPSG:4326 and",
+        "each ring closes. A polygon must cover at least 1 ha (one WaPOR pixel).",
+        "Any extra properties are carried through to the results and the CSV."
+      ],
+      features: FIELDS.slice(0, TPL_N).map(f => ({
+        type:"Feature",
+        properties: Object.assign({
+          ID:f.id, Name:f.name, SOS:f.sos, EOS:f.eos,
+          Scheme_ID:f.scheme, Area_ha:f.area_ha
+        }, TPL_CROP),
+        geometry:{ type:"Polygon", coordinates:[f.ring_deg[0].slice()] }
+      }))
+    };
+  }
+  return {
+    type:"FeatureCollection",
+    name:"Irrigated_Wheat_2026_PNT",
+    _README:[
+      "Irrigated wheat 2026 - monitoring points. Two features from the real survey",
+      "layer, as a template: keep the property names and replace the values and",
+      "geometry. Add as many features as you need.",
+      "Required: ID (unique positive integer), Name, SOS and EOS (ISO dates, EOS",
+      "after SOS) and Location - the plot number the sample belongs to. Points",
+      "sharing a Location are aggregated to that plot by median, so one",
+      "unrepresentative sample cannot move the plot value.",
+      "Coordinates are [longitude, latitude] in EPSG:4326."
+    ],
+    features: POINTS.slice(0, TPL_N).map(p => ({
+      type:"Feature",
+      properties: Object.assign({
+        ID:p.id, Name:p.name, Location:p.loc, SOS:p.g.sos, EOS:p.g.eos,
+        Scheme_ID:p.scheme
+      }, TPL_CROP),
+      geometry:{ type:"Point", coordinates:[p.lon, p.lat] }
+    }))
+  };
+}
+
+/* =========================================================
+   Run / reset / export
+   ========================================================= */
+function runAnalysis(){
+  if(S.run === "running") return;
+  const feats = S.customs.map(c => ({ id:"C"+c.id, y:c.EYield_tpha, wp:c.WP_kgpm3 }));
+  if(!feats.length){
+    S.inputErr = "Add a point or draw a polygon first — the analysis runs on your areas of interest.";
+    render(); return;
+  }
+  if(!SERVER){
+    S.inputErr = "Run analysis needs the WWP server, which retrieves the WaPOR rasters. "+
+                 "Start it with: python server/run.py";
+    render();
+    return;
+  }
+  runTotal = feats.length;
+  S.run = "running"; S.prog = 0;
+  S.progPost = "Retrieving WaPOR NPP & AETI — two to three minutes per feature…";
+  S.sel = null; S.inputErr = null;
+  render();
+  runOnServer();
+}
+
+/* Kept only so the progress card has a shape to animate against; the simulated
+   walk-through went with the synthetic provider. */
+function _timedRun(feats){
+  let i = 0;
+  clearInterval(runTimer);
+  runTimer = setInterval(() => {
+    i++;
+    const f = feats[i-1];
+    if(i >= feats.length){
+      clearInterval(runTimer);
+      S.run = "done"; S.prog = feats.length; S.progPost = "";
+      if(MAP.ready && MAP.bounds) MAP.map.flyToBounds(MAP.bounds, { duration:0.7 });
+      render();
+    } else {
+      S.prog = i;
+      S.progPost = "ID="+f.id+", Yield="+f.y.toFixed(2)+", CWP="+f.wp.toFixed(2);
+      renderMapChrome();
+    }
+  }, 650);
+}
+/* Server run: POST every area of interest, then take its numbers verbatim. */
+function runOnServer(){
+  const body = { features: S.customs.map(c => ({
+    id: c.id, name: c.name, kind: c.kind, sos: c.SOS, eos: c.EOS,
+    location: c.kind === "point" ? c.loc : null,
+    lon: c.kind === "point" ? c.lng : null,
+    lat: c.kind === "point" ? c.lat : null,
+    ring: c.kind === "polygon" ? c.latlngs.map(p => [p[1], p[0]]) : null
+  })) };
+  fetch(API+"estimate", {
+    method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body)
+  })
+    .then(r => r.json().then(j => ({ ok:r.ok, j:j })))
+    .then(res => {
+      if(!res.ok){
+        const d = res.j && res.j.detail;
+        throw new Error(typeof d === "string" ? d : JSON.stringify(d));
+      }
+      const by = {};
+      res.j.forEach(e => by[e.id] = e);
+      S.customs = S.customs.map(c => {
+        const e = by[c.id];
+        if(!e) return c;
+        return Object.assign({}, c, {
+          NPP:e.NPP, EYield_tpha:e.EYield_tpha, AETI_mm:e.AETI_mm,
+          WP_kgpm3:e.WP_kgpm3, LGP:e.LGP,
+          area: e.area_ha != null ? e.area_ha : c.area
+        });
+      });
+      S.run = "done"; S.prog = runTotal; S.progPost = "";
+      if(MAP.ready && MAP.bounds) MAP.map.flyToBounds(MAP.bounds, { duration:0.7 });
+      const warned = res.j.filter(e => e.warning);
+      S.inputErr = warned.length
+        ? warned.length+" feature"+(warned.length === 1 ? "" : "s")+" on very few pixels — "+warned[0].warning
+        : null;
+      notify(runTotal+" feature"+(runTotal === 1 ? "" : "s")+" estimated from FAO WaPOR v3.");
+      render();
+    })
+    .catch(err => {
+      S.run = "idle"; S.prog = 0; S.progPost = "";
+      S.inputErr = "Server run failed: "+err.message;
+      render();
+    });
+}
+
+function resetAll(){
+  clearInterval(runTimer);
+  if(MAP.ready){
+    if(MAP.sketch){ MAP.map.removeLayer(MAP.sketch); MAP.sketch = null; }
+    Object.keys(MAP.custom).forEach(k => MAP.map.removeLayer(MAP.custom[k]));
+    if(MAP.bounds) MAP.map.flyToBounds(MAP.bounds, { duration:0.7 });
+  }
+  MAP.custom = {};
+  cid = 0; runTotal = 0;
+  Object.assign(S, { sel:null, customs:[], obs:{}, pending:null, manualOpen:false, drawing:false,
+    drawPts:[], run:"idle", prog:0, progPost:"", inputErr:null, idVal:"1", nameVal:"", loc:"1",
+    validationOpen:false });
+  $("m-manual").hidden = true;
+  render();
+}
+function exportAoi(){
+  const header = ["ID","Name","Type","Lon","Lat","Area_ha","Location","SOS","EOS","LGP","NPP",
+    "EYield_tpha","AETI_mm","WP_kgpm3","MeasuredYield_tpha","MeasuredWP_kgpm3"];
+  const q = v => (v == null ? "" : /[",]/.test(String(v)) ? '"'+String(v).replace(/"/g,'""')+'"' : v);
+  const rows = S.customs.map(c => {
+    const ctr = c.kind === "point" ? [c.lng,c.lat] : (() => {
+      const n = c.latlngs.length;
+      return [c.latlngs.reduce((s,p) => s+p[1], 0)/n, c.latlngs.reduce((s,p) => s+p[0], 0)/n];
+    })();
+    const o = S.obs["c"+c.id] || {};
+    return [c.id, q(c.name), c.kind, ctr[0].toFixed(6), ctr[1].toFixed(6),
+      c.area != null ? c.area.toFixed(2) : "", c.loc != null ? c.loc : "",
+      c.SOS, c.EOS, c.LGP, c.NPP, c.EYield_tpha, c.AETI_mm, c.WP_kgpm3,
+      o.y == null ? "" : o.y, o.w == null ? "" : o.w];
+  });
+  const csv = [header.join(",")].concat(rows.map(r => r.join(","))).join("\n");
+  saveFile("wwp_aoi_results.csv", csv);
+}
+/* Two save routes. In the artifact viewer a page can only hand a file to the viewer
+   through the downloads capability, and the viewer confirms it; a plain <a download>
+   is silently inert there. Served locally, the blob route is the working one. */
+function saveFile(filename, text){
+  if(window.claude && typeof window.claude.use === "function"){
+    window.claude.use("downloads").then(dl => {
+      if(!dl){ copyOut(text, "Saving files is not available in this view."); return; }
+      dl.save({ filename:filename, data:text })
+        .then(() => notify(filename+" saved."))
+        .catch(err => {
+          const code = err && err.code;
+          if(code === "extension_not_enabled" || code === "rejected_extension"){
+            const alt = filename.replace(/\.[^.]+$/, ".txt");
+            dl.save({ filename:alt, data:text })
+              .then(() => notify(alt+" saved — rename it to the extension you need."))
+              .catch(e2 => { if(!e2 || e2.code !== "declined") copyOut(text, "Could not save the file."); });
+          } else if(code === "declined" || code === "rate_limited"){
+            /* the viewer said no, or a prompt is already open — leave it be */
+          } else {
+            copyOut(text, "Could not save the file.");
+          }
+        });
+    });
+    return;
+  }
+  try{
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type:"text/csv" }));
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    notify(filename+" exported.");
+  }catch(e){ copyOut(text, "Could not start the download."); }
+}
+function copyOut(text, why){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text)
+      .then(() => notify(why+" The results were copied to the clipboard instead."))
+      .catch(() => notify(why));
+  } else notify(why);
+}
+
+/* =========================================================
+   Place search (ToR WP2b) — move the map to a named place
+   ========================================================= */
+function showResults(items){
+  const box = $("searchresults");
+  if(!items){ box.hidden = true; box.innerHTML = ""; return; }
+  if(!items.length){
+    box.innerHTML = '<li class="none">Nothing found. Try a district name, or paste "lat, lon".</li>';
+    box.hidden = false;
+    return;
+  }
+  box.innerHTML = items.map((r,i) =>
+    '<li><button type="button" data-hit="'+i+'"><span class="k">'+esc(r.kind || "place")+"</span>"+
+    esc(r.name)+"</button></li>").join("");
+  box.hidden = false;
+  box.querySelectorAll("[data-hit]").forEach(b =>
+    b.addEventListener("click", () => { goTo(items[+b.dataset.hit]); showResults(null); }));
+}
+
+function goTo(hit){
+  if(!MAP.ready) return;
+  if(hit.bbox){
+    /* [south, west, north, east] as the server hands it over */
+    MAP.map.flyToBounds(L.latLngBounds([hit.bbox[0],hit.bbox[1]],[hit.bbox[2],hit.bbox[3]]),
+                        { maxZoom:14, duration:0.9 });
+  } else {
+    MAP.map.flyTo([hit.lat, hit.lon], Math.max(MAP.map.getZoom(), 13), { duration:0.9 });
+  }
+  notify("Moved to "+String(hit.name).split(",")[0]+".");
+}
+
+/* Local first: an area already on the map, then a coordinate pair. Only then the
+   network, so the common cases work with no round trip and no server. */
+function localMatches(q){
+  const t = q.trim().toLowerCase();
+  if(!t) return [];
+  const named = S.customs
+    .filter(c => String(c.name).toLowerCase().indexOf(t) >= 0)
+    .map(c => ({
+      name:c.name+" — your area of interest", kind:"loaded area", sel:"c"+c.id,
+      lat: c.kind === "point" ? c.lat : mean(c.latlngs.map(p => p[0])),
+      lon: c.kind === "point" ? c.lng : mean(c.latlngs.map(p => p[1])),
+      bbox: c.kind === "polygon"
+        ? [Math.min.apply(null,c.latlngs.map(p=>p[0])), Math.min.apply(null,c.latlngs.map(p=>p[1])),
+           Math.max.apply(null,c.latlngs.map(p=>p[0])), Math.max.apply(null,c.latlngs.map(p=>p[1]))]
+        : null
+    }));
+  const parts = t.replace(/,/g," ").split(/\s+/).filter(Boolean);
+  if(parts.length === 2){
+    const a = Number(parts[0]), b = Number(parts[1]);
+    if(isFinite(a) && isFinite(b)){
+      const pair = (Math.abs(a) <= 90) ? [a,b] : [b,a];
+      if(Math.abs(pair[0]) <= 90 && Math.abs(pair[1]) <= 180)
+        named.push({ name:pair[0].toFixed(5)+", "+pair[1].toFixed(5), kind:"coordinates",
+                     lat:pair[0], lon:pair[1], bbox:null });
+    }
+  }
+  return named;
+}
+
+function runSearch(){
+  const q = $("searchq").value.trim();
+  if(!q){ showResults(null); return; }
+  const local = localMatches(q);
+  if(local.length){
+    if(local.length === 1 && local[0].sel){ select(local[0].sel); showResults(null); return; }
+    showResults(local);
+    if(local.length === 1) { goTo(local[0]); showResults(null); }
+    return;
+  }
+  if(!SERVER){
+    S.inputErr = "Place search needs the WWP server. Paste coordinates as \"lat, lon\" instead, "+
+                 "or start the server with: python server/run.py";
+    render();
+    return;
+  }
+  showResults([{ name:"Searching…", kind:"" }]);
+  fetch(API+"geocode?q="+encodeURIComponent(q)+"&limit=6")
+    .then(r => r.json().then(j => ({ ok:r.ok, j:j })))
+    .then(res => {
+      if(!res.ok) throw new Error((res.j && res.j.detail) || "search failed");
+      showResults(res.j.results || []);
+    })
+    .catch(err => { showResults([]); S.inputErr = "Place search failed: "+err.message; render(); });
+}
+
+/* =========================================================
+   Wiring
+   ========================================================= */
+function flyTo(id){
+  if(!MAP.ready) return;
+  const lyr = (id && id[0] === "c") ? MAP.custom[id.slice(1)] : null;
+  if(!lyr){ if(MAP.bounds) MAP.map.flyToBounds(MAP.bounds, { duration:0.9 }); return; }
+  if(lyr.getBounds) MAP.map.flyToBounds(lyr.getBounds().pad(0.8), { maxZoom:15, duration:0.9 });
+  else MAP.map.flyTo(lyr.getLatLng(), Math.max(MAP.map.getZoom(), 13), { duration:0.9 });
+}
+function select(id){
+  if(S.drawing) return;
+  S.sel = (S.sel === id) ? null : id;
+  flyTo(S.sel);
+  render();
+}
+function render(){
+  renderSidebar();
+  renderMapChrome();
+  if(MAP.ready) restyle(); else renderSvgMap();
+  renderPanel();
+}
+
+$("seg-point").addEventListener("click", () => {
+  if(S.drawing) cancelDraw();
+  S.inputMode = "point"; S.inputErr = null; render();
+});
+$("seg-poly").addEventListener("click", () => {
+  if(S.drawing) cancelDraw();
+  S.inputMode = "polygon"; S.inputErr = null; render();
+});
+$("drawbtn").addEventListener("click", () => {
+  if(S.drawing){ cancelDraw(); return; }
+  if(!MAP.ready){
+    notify("Drawing needs the interactive map, which could not load here.");
+    return;
+  }
+  S.drawing = true; S.drawPts = []; S.inputErr = null; S.manualOpen = false;
+  $("m-manual").hidden = true;
+  MAP.map.doubleClickZoom.disable();
+  render();
+});
+$("uploadbtn").addEventListener("click", () => $("aoiFile").click());
+$("mapsearch").addEventListener("submit", e => { e.preventDefault(); runSearch(); });
+$("searchq").addEventListener("input", () => { if(!$("searchq").value.trim()) showResults(null); });
+document.addEventListener("click", e => {
+  if(!e.target.closest || !e.target.closest("#mapsearch")) showResults(null);
+});
+document.querySelectorAll("[data-tpl]").forEach(b =>
+  b.addEventListener("click", () => {
+    const kind = b.dataset.tpl;
+    /* .json, not .geojson: the download surface allows json and the uploader
+       accepts it, so the file works without renaming. */
+    const t = template(kind);
+    saveFile(t.name+".json", JSON.stringify(t, null, 2));
+  }));
+$("aoiFile").addEventListener("change", handleUpload);
+$("runbtn").addEventListener("click", runAnalysis);
+$("resetbtn").addEventListener("click", resetAll);
+$("commitPending").addEventListener("click", commitPending);
+["Streets","Satellite"].forEach(name => {
+  $("bm-"+name).addEventListener("click", () => {
+    if(S.basemap === name) return;
+    S.basemap = name;
+    ["Streets","Satellite"].forEach(o => {
+      const b = $("bm-"+o);
+      b.classList.toggle("on", o === name);
+      b.setAttribute("aria-pressed", String(o === name));
+    });
+    if(MAP.ready && MAP.tiles[name]){
+      MAP.map.removeLayer(MAP.cur);
+      MAP.cur = MAP.tiles[name].addTo(MAP.map);
+    }
+  });
+});
+$("nav-dash").addEventListener("click", () => select(null));
+document.querySelectorAll("[data-modal]").forEach(b =>
+  b.addEventListener("click", () => {
+    const m = $("m-"+b.dataset.modal);
+    m.hidden = false;
+    m.querySelector("[data-close]").focus();
+  }));
+document.querySelectorAll(".modal").forEach(m => {
+  m.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", () => {
+    if(m.id === "m-manual") discardPending(); else m.hidden = true;
+  }));
+  m.addEventListener("click", e => {
+    if(e.target !== m) return;
+    if(m.id === "m-manual") discardPending(); else m.hidden = true;
+  });
+});
+document.addEventListener("keydown", e => {
+  if(e.key !== "Escape") return;
+  if(S.drawing){ cancelDraw(); return; }
+  if(!$("m-manual").hidden){ discardPending(); return; }
+  document.querySelectorAll(".modal").forEach(m => m.hidden = true);
+});
+
+if(!HAS_L){
+  $("mapctl").hidden = true;
+  /* Nothing to move: the fallback map is fitted to the data and does not pan. */
+  $("mapsearch").hidden = true;
+  let rt = null;
+  addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderSvgMap, 140); });
+} else {
+  bootLeaflet();
+}
+render();
+probeServer();
+})();
+</script>

@@ -64,9 +64,19 @@ export default function MapView({
     if (layers.current.aoi) { map.removeLayer(layers.current.aoi); layers.current.aoi = null }
     if (!aoiOutline) return
     const style = { color: '#14432b', weight: 2, dashArray: '6 4', fill: false }
-    layers.current.aoi = aoiOutline.polys
-      ? L.polygon(aoiOutline.polys, style).addTo(map)
-      : L.rectangle(aoiOutline.bounds, style).addTo(map)
+    if (aoiOutline.points) {
+      // Sample points are the geometry, so drawing their bounding box instead
+      // would show an extent the user never selected.
+      layers.current.aoi = L.layerGroup(
+        aoiOutline.points.map((pt) => L.circleMarker(pt, {
+          radius: 4, color: '#14432b', weight: 2, fillColor: '#27824d', fillOpacity: 0.85,
+        }))
+      ).addTo(map)
+    } else {
+      layers.current.aoi = aoiOutline.polys
+        ? L.polygon(aoiOutline.polys, style).addTo(map)
+        : L.rectangle(aoiOutline.bounds, style).addTo(map)
+    }
   }, [aoiOutline])
 
   useEffect(() => {

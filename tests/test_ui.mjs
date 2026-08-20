@@ -34,10 +34,10 @@ await page.locator('.runbtn').click()
 await page.waitForSelector('.kpi.hero', { timeout: 90000 })
 const heroText = await page.locator('.kpi.hero .v').innerText()
 check('hero KPI renders', /^\d\.\d\d/.test(heroText), heroText.replace(/\s+/g, ' '))
-check('5 KPI tiles', (await page.locator('.kpi').count()) === 5)
+check('6 KPI tiles', (await page.locator('.kpi').count()) === 6)
 check('legend now visible', await page.locator('.legend').isVisible())
 check('raster overlay on map', (await page.locator('img.pix, .pix').count()) >= 1)
-check('3 charts rendered', (await page.locator('.chartbox svg').count()) === 3,
+check('2 charts rendered', (await page.locator('.chartbox svg').count()) === 2,
   `${await page.locator('.chartbox svg').count()} svgs`)
 check('results panel appears after the run', (await page.locator('.results').count()) === 1)
 await page.waitForTimeout(1200)
@@ -77,8 +77,17 @@ const trendPts = await page.locator('.chartsec:has-text("Seasonal trend") circle
 check('trend has 5 markers', trendPts === 5, `${trendPts}`)
 const histBars = await page.locator('.chartsec:has-text("Distribution") path').count()
 check('histogram bars drawn', histBars >= 1, `${histBars} bars`)
-const featBars = await page.locator('.chartsec:has-text("What drives") path').count()
-check('feature bars drawn', featBars === 10, `${featBars}`)
+// The estimation chain replaces the model-importance chart: it is text, not
+// marks, so it is checked by content rather than by shape count.
+const chainSec = page.locator('.chartsec:has-text("How this estimate is built")')
+check('estimation chain rendered', (await chainSec.locator('.chain li').count()) === 5,
+  `${await chainSec.locator('.chain li').count()} steps`)
+const chainSteps = await chainSec.locator('.chain .nm').allInnerTexts()
+check('chain runs NPP to water productivity',
+  chainSteps[0] === 'Seasonal NPP' && chainSteps.at(-1) === 'Water productivity',
+  chainSteps.join(' -> '))
+check('chain shows the crop parameters applied',
+  (await chainSec.locator('.chain .op').allInnerTexts()).join(' ').includes('harvest index'))
 // No SVG text may sit outside its viewBox (label overflow check).
 const overflow = await page.evaluate(() => {
   const bad = []
@@ -97,7 +106,7 @@ check('no chart label overflows its viewBox', overflow.length === 0, overflow.sl
 
 console.log('\n4. Table views (no value gated behind hover)')
 const toggles = page.locator('.tablebtn')
-check('a table toggle per chart', (await toggles.count()) === 3, `${await toggles.count()}`)
+check('a table toggle per chart', (await toggles.count()) === 2, `${await toggles.count()}`)
 await toggles.first().click()
 await page.waitForSelector('.dtable')
 const rows = await page.locator('.dtable tbody tr').count()
@@ -113,15 +122,25 @@ const popVal = await page.locator('.pop .pv').innerText()
 check('popup shows a WWP value', /^\d\.\d\d$/.test(popVal), popVal)
 await page.screenshot({ path: `${OUT}/03-popup.png` })
 await page.locator('#explainLink').click()
-await page.waitForSelector('.chartsec:has-text("Prediction explanation")', { timeout: 30000 })
-const shapBars = await page.locator('.chartsec:has-text("Prediction explanation") path').count()
-check('explanation bars drawn', shapBars === 7, `${shapBars}`)
-const legendSwatches = await page.locator('.chartsec:has-text("Prediction explanation") rect[rx="2"]').count()
-check('explanation has raises/lowers legend', legendSwatches === 2, `${legendSwatches} swatches`)
+// Addressed by id: ':has-text' is case-insensitive, so a text selector here
+// also matches the 'Show the derivation' hint shown before one is loaded.
+const derivation = page.locator('#derivation')
+await derivation.waitFor({ timeout: 30000 })
+check('derivation lists every step', (await derivation.locator('.chain li').count()) === 5,
+  `${await derivation.locator('.chain li').count()} steps`)
+// The whole claim of a deterministic method is that the shown numbers add up.
+// Verify that from the rendered text, not from the API response.
+const shown = await derivation.locator('.chain .val').allInnerTexts()
+const num = (t) => parseFloat(t.replace(/[^0-9.]/g, ''))
+check('rendered chain reproduces the rendered result',
+  Math.abs(num(shown[2]) / num(shown[3]) - num(shown[4])) < 0.01,
+  `${shown[2]} / ${shown[3]} = ${shown[4]}`)
+check('derivation matches the pixel popup value',
+  Math.abs(num(shown[4]) - parseFloat(popVal)) < 0.01, `${shown[4]} vs ${popVal}`)
 await page.waitForTimeout(900)
 await page.screenshot({ path: `${OUT}/04-explain.png` })
-await page.locator('.chartsec:has-text("Prediction explanation")').scrollIntoViewIfNeeded()
-await page.screenshot({ path: `${OUT}/05-explain-closeup.png`, clip: await page.locator('.chartsec:has-text("Prediction explanation")').boundingBox() })
+await derivation.scrollIntoViewIfNeeded()
+await page.screenshot({ path: `${OUT}/05-explain-closeup.png`, clip: await derivation.boundingBox() })
 
 console.log('\n6. Irrigated system switches the season list')
 await page.locator('.seg button:has-text("Irrigated")').click()
@@ -206,6 +225,67 @@ for (const [w, h, label] of [[1600, 950, 'desktop'], [1280, 800, 'laptop'], [900
     `${ftr.clip}px hidden (height ${ftr.h}px)`)
   await page.screenshot({ path: `${OUT}/10-${label}-${w}.png`, fullPage: w < 1100 })
 }
+
+console.log('\n10b. Scheme workflow: the reference notebook input and output')
+/* Driven through the ready-made-file list rather than a hand-built fixture: that
+   is the path a first-time user takes, so if the workflow is unreachable from
+   the interface this check fails even though the API still works.
+
+   Which file is used depends on the machine. Where the 2026 campaign shapefiles
+   are present the real 57-sample point file is exercised; elsewhere the
+   generated sample stands in. Both hold six plots, so only the number of sample
+   rows differs, and that is read from the service rather than assumed. */
+const PLOTS = 6
+const listed = await (await fetch(`${BASE}/api/schemes/datasets`)).json()
+const dataset = (listed.datasets || []).find((d) => d.geometry_type === 'point')
+check('the service offers a point dataset to try', !!dataset,
+  (listed.datasets || []).map((d) => d.name).join(', '))
+const SAMPLES = dataset.n_features
+await page.setViewportSize({ width: 1600, height: 950 })
+await page.waitForTimeout(300)
+await page.locator('.tabs button:has-text("Upload")').click()
+const dsBtn = page.locator(`.side .datasets .linkbtn[data-dataset="${dataset.name}"]`)
+check('the upload panel offers that dataset for per-plot estimation',
+  (await dsBtn.count()) === 1, dataset.name)
+check('every offered dataset says how large it is',
+  (await page.locator('.side .datasets .ds .meta').count())
+  === (listed.datasets || []).length, `${(listed.datasets || []).length} datasets`)
+await dsBtn.click()
+await page.waitForSelector('.schemeask', { timeout: 30000 })
+check('point file offers per-plot estimation',
+  (await page.locator('.schemeask .runbtn').innerText()).includes('Estimate each plot'))
+await page.locator('.schemeask .runbtn').click()
+await page.waitForSelector('.results:has-text("Scheme results")', { timeout: 90000 })
+check('validation message is the one the notebook prints',
+  (await page.locator('.banner.ok b').innerText()) === 'Data validation is successful!')
+const yieldSec = page.locator('.chartsec:has-text("Estimated yield by scheme")')
+const wpSec = page.locator('.chartsec:has-text("Water productivity by scheme")')
+const yieldBars = await yieldSec.locator('svg path').count()
+check('yield figure drawn', yieldBars === PLOTS, `${yieldBars} bars`)
+check('water-productivity figure drawn',
+  (await wpSec.locator('svg path').count()) === PLOTS)
+const aggRows = await page.locator('.chartsec:has-text("Per-plot medians") .dtable tbody tr').count()
+check('one aggregated row per plot', aggRows === PLOTS, `${aggRows} rows`)
+const featRows = await page.locator('.chartsec:has-text("Every sample point") .dtable tbody tr').count()
+check('one row per sample point', featRows === SAMPLES,
+  `${featRows} rows from ${dataset.name} (${SAMPLES} features)`)
+const heads = await page.locator('.chartsec:has-text("Every sample point") .dtable th').allInnerTexts()
+check('result columns use the notebook field names',
+  ['NPP', 'EYield_tpha', 'AETI_mm', 'WP_kgpm3', 'LGP'].every((c) => heads.some((h) => h.startsWith(c))),
+  heads.join(' | ').slice(0, 90))
+check('both CSV downloads offered',
+  (await page.locator('.results a[href*="schemes/export/csv"]').count()) === 2)
+await page.screenshot({ path: `${OUT}/10b-schemes.png` })
+/* Wide result tables must scroll inside their own box, never widen the page. */
+for (const [w, label] of [[1600, 'desktop'], [420, 'mobile']]) {
+  await page.setViewportSize({ width: w, height: 950 })
+  await page.waitForTimeout(400)
+  const over = await page.evaluate(() =>
+    document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  check(`scheme results ${label} ${w}px: no page overflow`, over <= 1, `overflow ${over}px`)
+  if (w === 420) await page.screenshot({ path: `${OUT}/10b-schemes-mobile.png`, fullPage: true })
+}
+await page.setViewportSize({ width: 1600, height: 950 })
 
 console.log('\n11. Console cleanliness')
 // The 422 is the deliberate bad-upload rejection from step 7, not a defect.

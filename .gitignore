@@ -4,9 +4,6 @@ __pycache__/
 .venv/
 venv/
 
-# Generated model artifacts — retrain with `python backend/train_model.py`
-backend/models/
-
 # Frontend
 node_modules/
 frontend/dist/
@@ -20,6 +17,11 @@ tests/package*.json
 docs/node_modules/
 docs/package*.json
 docs/pdf/*.html
+
+# IWMI campaign field data. Kept out of the repository deliberately: the app
+# reads it from this directory when it is present (backend/app/campaign.py) and
+# offers a generated sample when it is not, so nothing here needs committing.
+Data/
 
 # Office lock files and OS cruft
 ~$*
